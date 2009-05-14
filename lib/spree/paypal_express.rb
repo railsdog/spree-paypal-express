@@ -89,11 +89,11 @@ module Spree::PaypalExpress
              :payer_id => params[:PayerID] }.merge all_opts(@order)
     info = gateway.details_for params[:token]
     response = gateway.authorize(opts[:money], opts)
-    #render :text => "<pre>" + params.to_yaml + "\n\n\n" + out1.to_yaml + "\n\n\n" + info.to_yaml + "</pre>" 
+
     # unless gateway.successful? response
     unless [ 'Success', 'SuccessWithWarning' ].include?(response.params["ack"])    ## HACKY
       # TMP render :text => "<pre>" + response.params.inspect + "\n\n\n" + params.to_yaml + "\n\n\n" + response.to_yaml + "\n\n\n" + info.to_yaml + "</pre>" and return
-      # gateway_error(response)
+      # OFF FOR TESTING : gateway_error(response)
     end
 
     # now save info
@@ -111,8 +111,8 @@ module Spree::PaypalExpress
                                         :country    => Country.find_by_iso(ship_address["country"]),
                                         :zipcode    => ship_address["zip"],
                                         :phone      => ship_address["phone"] || "(not given)"
-    shipment = Shipment.create :address     => order.ship_address,
-                               :ship_method => ShippingMethod.first # TODO: refine/choose
+    shipment = Shipment.create :address         => order.ship_address,
+                               :shipping_method => ShippingMethod.first # TODO: refine/choose
     order.shipments << shipment
 
     fake_card = Creditcard.new :order          => order, 
