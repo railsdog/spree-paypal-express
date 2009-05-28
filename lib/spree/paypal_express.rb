@@ -34,8 +34,8 @@ module Spree::PaypalExpress
                 :depth       => item.variant.weight }
             end
 
-    site = Spree::Config[:site_url]
     site = "localhost:3000" 
+    site = Spree::Config[:site_url]
 
     opts = { :return_url        => "https://" + site + "/orders/#{order.number}/paypal_finish",
              :cancel_return_url => "http://"  + site + "/orders/#{order.number}/edit",
@@ -140,24 +140,17 @@ module Spree::PaypalExpress
 
   private
 
-  # temporary until options are sorted out
+  # copied from main spree code, and slightly tweaked
   def paypal_gateway
-    gw_opts = { :login => "paul_1240924284_biz_api1.rocket-works.co.uk", 
-                :password => "HPDLRQ5DGPAWDAUB",
-                :signature => "A2VYNHC1wYRx0ZwMX6dXwoFDGTMnAYt4SmzCH6LS3nVKLszXCtL-rp9o" } # or by cls
-    gateway = ActiveMerchant::Billing::PaypalExpressUkGateway.new gw_opts
-    return gateway
-
     #? return Spree::BogusGateway.new if ENV['RAILS_ENV'] == "development" and Spree::Gateway::Config[:use_bogus]
-    gateway_config = GatewayConfiguration.find_by_name "Paypal Express (UK)" 
+    paypal_gw = ::Gateway.find_by_name("Paypal Express UK")
+    gateway_config = GatewayConfiguration.find_by_gateway_id(paypal_gw.id)
     config_options = {}
     gateway_config.gateway_option_values.each do |option_value|
       key = option_value.gateway_option.name.to_sym
       config_options[key] = option_value.value
     end
     gateway = gateway_config.gateway.clazz.constantize.new(config_options)
-      #
-      # => [#<GatewayOptionValue id: 11, gateway_configuration_id: 1, gateway_option_id: 12, value: "simplybenches", created_at: "2009-04-05 09:46:52", updated_at: "2009-04-05 09:46:52">] >> GatewayConfiguration => GatewayConfiguration(id: integer, gateway_id: integer, created_at: datetime, updated_at: datetime) >> GatewayConfiguration.all => [#<GatewayConfiguration id: 1, gateway_id: 5, created_at: "2009-02-19 23:17:43", updated_at: "2009-03-17 11:52:09">]
   end
 
 end
