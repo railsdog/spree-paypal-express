@@ -1,0 +1,33 @@
+<%= render :partial => 'admin/shared/order_tabs', :locals => {:current => "Payments"} %>
+<br/>
+<h2><%= t("paypal_payment")%></h2>
+<br/>
+<b><%= t("paypal_txn_id")%>: </b> &nbsp; #<%= @paypal_payment.creditcard.display_number %><br/>
+<br/>         
+<%=error_messages_for :paypal_payment %>
+
+<% form_for(@paypal_payment, :url => object_url, :html => { :method => :put}) do |payment_form| %>
+	<table class="index">
+	  <tr>
+	    <th><%= t("transaction") %></th>
+	    <th><%= t("amount") %></th>
+	    <th><%= t("response_code") %></th>
+	    <th><%= "#{t('spree.date')}/#{t('spree.time')}" %></th>
+	  </tr>
+	  <% @paypal_payment.txns.each do |t| %>
+	    <tr>
+	      <td><%=CreditcardTxn::TxnType.from_value t.txn_type.to_i%></td>
+	      <td><%=number_to_currency t.amount%></td>
+	      <td><%=t.response_code%></td>
+	      <td><%=t.created_at.to_s(:date_time24)%></td>
+	    </tr>
+	  <% end %>
+	</table>
+
+	<p class="form-buttons">
+	  <%= button t('update') %>
+	</p>	
+
+<% end %>
+<%= link_to t("capture").titleize, capture_admin_order_paypal_payment_url(@order, @paypal_payment), :confirm => t('are_you_sure_you_want_to_capture') if @paypal_payment.can_capture?  %> &nbsp;
+<%= link_to t("list"), collection_url %>

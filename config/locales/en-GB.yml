@@ -1,0 +1,7 @@
+---
+en-GB:
+  paypal_payment: Paypal Express Payment
+  paypal_txn_id: Transaction Code
+  paypal_capture_complete: Paypal Transaction has been captured.
+  unable_to_capture_paypal: Unable to capture Paypal Transaction.
+

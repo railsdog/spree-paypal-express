@@ -1,0 +1,28 @@
+
+Results from a capture - how much do I need to keep? check...
+
+---
+:tax_amount: "37.50"
+:gross_amount: "249.00"
+:payment_status: Pending
+:gross_amount_currency_id: GBP
+:authorization_id: 6WF137128R766191U
+:pending_reason: payment-review
+:receipt_id:
+:transaction_id: 45D337153N9936001
+:build: "962735"
+:fee_amount: "8.67"
+:reason_code: none
+:correlation_id: cee300cb3a234
+:fee_amount_currency_id: GBP
+:transaction_type: express-checkout
+:ack: Success
+:timestamp: "2009-07-06T10:36:35Z"
+:protection_eligibility: Ineligible
+:parent_transaction_id: 6WF137128R766191U
+:tax_amount_currency_id: GBP
+:version: "57.0"
+:payment_type: instant
+:exchange_rate:
+:payment_date: "2009-07-06T10:36:34Z"
+

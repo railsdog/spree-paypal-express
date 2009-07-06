@@ -1,12 +1,14 @@
-# Adapted for protx3ds
+# WARNING: the details of UK tax and my site's shipping are a bit hard-coded here for now
+# aim to unpick this later
 module Spree::PaypalExpress
   include ERB::Util
   include Spree::PaymentGateway
+  include Spree::PaypalExpress::Gateway
 
   def fixed_opts
-    { :description             => "Parasols or related outdoor items", # site details...
+    { :description             => "Goods from a Spree-based site", # site details...
 
-      #:page_style             => "foobar", # merchant account can set default
+      #:page_style             => "foobar", # merchant account can set named config
       :header_image            => "https://" + Spree::Config[:site_url] + "/images/logo.png", 
       :background_color        => "e1e1e1",  # must be hex only, six chars
       :header_background_color => "ffffff",  
@@ -14,12 +16,14 @@ module Spree::PaypalExpress
 
       :allow_note              => true,
       :locale                  => Spree::Config[:default_locale],
-      :notify_url              => 'to be done',
+      :notify_url              => 'to be done',                 # this is a callback
 
       :req_confirm_shipping    => false,   # for security, might make an option later
     }
   end           
 
+  # TODO: generalise the tax and shipping calcs
+  # might be able to get paypal to do some of the shipping choice and costing
   def order_opts(order)
     items = order.line_items.map do |item|
               { :name        => item.variant.product.name,
@@ -34,20 +38,16 @@ module Spree::PaypalExpress
                 :depth       => item.variant.weight }
             end
 
-    site = "localhost:3000" 
-    site = Spree::Config[:site_url]
-
-    opts = { :return_url        => "https://" + site + "/orders/#{order.number}/paypal_finish",
-             :cancel_return_url => "http://"  + site + "/orders/#{order.number}/edit",
+    opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/paypal_finish",
+             :cancel_return_url => "http://"  + request.host_with_port + "/orders/#{order.number}/edit",
              :order_id          => order.number,
-             :custom            => order.number + '--' + order.number,
+             :custom            => order.number,
 
              # :no_shipping     => false,
              # :address_override => false,
 
              :items    => items,
              :subtotal => items.map {|i| i[:amount] * i[:qty] }.sum,
-             :shipping => NetstoresShipping::Calculator.calculate_order_shipping(order),  # NEED HIDE
              :handling => 0,
              :tax      => items.map {|i| i[:tax] * i[:qty]}.sum
 
@@ -55,6 +55,16 @@ module Spree::PaypalExpress
              # they've not been tested and may trigger some paypal bugs, eg not showing order
              # see http://www.pdncommunity.com/t5/PayPal-Developer-Blog/Displaying-Order-Details-in-Express-Checkout/bc-p/92902#C851
            }
+
+    opts[:email] = current_user.email if current_user
+
+    opts
+  end
+
+  def all_opts(order)
+    shipping_cost = NetstoresShipping::Calculator.calculate_order_shipping(order)
+    opts = fixed_opts.merge(:shipping => shipping_cost).merge(order_opts order)
+
     # WARNING: paypal expects this sum to work (TODO: shift to AM code? and throw wobbly?)
     # however: might be rounding issues when it comes to tax, though you can capture slightly extra
     opts[:money] = opts.slice(:subtotal, :shipping, :handling, :tax).values.sum
@@ -64,13 +74,8 @@ module Spree::PaypalExpress
 
     [:money, :subtotal, :shipping, :handling, :tax].each {|amt| opts[amt] *= 100}
     opts[:items].each {|item| [:amount,:tax].each {|amt| item[amt] *= 100} }
-    opts[:email] = current_user.email if current_user
 
     opts
-  end
-
-  def all_opts(order)
-    fixed_opts.merge(order_opts order)
   end
 
   def paypal_checkout
@@ -78,9 +83,11 @@ module Spree::PaypalExpress
     gateway = paypal_gateway
   
     opts = all_opts(@order)
-    out2 = gateway.setup_authorization(opts[:money], opts)
+    response = gateway.setup_authorization(opts[:money], opts)
 
-    redirect_to (gateway.redirect_url_for out2.token) 
+    gateway_error(response) unless response.success?
+
+    redirect_to (gateway.redirect_url_for response.token) 
   end
 
   def paypal_finish
@@ -90,19 +97,15 @@ module Spree::PaypalExpress
     info = gateway.details_for params[:token]
     response = gateway.authorize(opts[:money], opts)
 
-    # unless gateway.successful? response
-    unless [ 'Success', 'SuccessWithWarning' ].include?(response.params["ack"])    ## HACKY
-      # TMP render :text => "<pre>" + response.params.inspect + "\n\n\n" + params.to_yaml + "\n\n\n" + response.to_yaml + "\n\n\n" + info.to_yaml + "</pre>" and return
-      # OFF FOR TESTING : gateway_error(response)
-    end
+    gateway_error(response) unless response.success?
 
     # now save info
     order = Order.find_by_number(params[:id])
-    order.email = info.email
-    order.special_instructions = info.params["note"]
+    order.checkout.email = info.email
+    order.checkout.special_instructions = info.params["note"]
 
     ship_address = info.address
-    order.ship_address = Address.create :firstname  => info.params["first_name"],
+    order_ship_address = Address.create :firstname  => info.params["first_name"],
                                         :lastname   => info.params["last_name"],
                                         :address1   => ship_address["address1"],
                                         :address2   => ship_address["address2"],
@@ -111,11 +114,11 @@ module Spree::PaypalExpress
                                         :country    => Country.find_by_iso(ship_address["country"]),
                                         :zipcode    => ship_address["zip"],
                                         :phone      => ship_address["phone"] || "(not given)"
-    shipment = Shipment.create :address         => order.ship_address,
-                               :shipping_method => ShippingMethod.first # TODO: refine/choose
-    order.shipments << shipment
 
-    fake_card = Creditcard.new :order          => order, 
+    order.checkout.update_attributes :ship_address    => order_ship_address,
+                                     :shipping_method => ShippingMethod.first          # TODO: refine/choose
+
+    fake_card = Creditcard.new :checkout       => order.checkout,
                                :cc_type        => "visa",   # hands are tied
                                :month          => Time.now.month, 
                                :year           => Time.now.year, 
@@ -137,6 +140,22 @@ module Spree::PaypalExpress
     session[:order_id] = nil if order.checkout_complete
     redirect_to order_url(order, :checkout_complete => true, :order_token => session[:order_token])
   end 
+
+
+  def do_capture(authorization)
+    response = paypal_gateway.capture((100 * authorization.amount).to_i, authorization.response_code)
+
+    gateway_error(response) unless response.success?
+
+    # TODO needs to be cleaned up or recast...
+    payment = PaypalPayment.find(authorization.creditcard_payment_id)
+
+    # create a transaction to reflect the capture
+    payment.txns << CreditcardTxn.new( :amount        => authorization.amount,
+                                       :response_code => response.authorization,
+                                       :txn_type      => CreditcardTxn::TxnType::CAPTURE )
+  end 
+
 
   private
 
