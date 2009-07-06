@@ -11,5 +11,6 @@ class CreatePaypalExpressGateway < ActiveRecord::Migration
   end
 
   def self.down
+    Gateway.find_by_name("Paypal Express UK").destroy
   end
 end
