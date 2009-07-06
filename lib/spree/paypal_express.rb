@@ -133,6 +133,8 @@ module Spree::PaypalExpress
                                      :txn_type => CreditcardTxn::TxnType::AUTHORIZE)
     payment.creditcard_txns << transaction
 
+    order.user = current_user
+
     order.save!
 
     order.complete  # get return of status? throw of problems??? else weak go-ahead
