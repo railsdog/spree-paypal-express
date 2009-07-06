@@ -3,7 +3,6 @@
 module Spree::PaypalExpress
   include ERB::Util
   include Spree::PaymentGateway
-  include Spree::PaypalExpress::Gateway
 
   def fixed_opts
     { :description             => "Goods from a Spree-based site", # site details...

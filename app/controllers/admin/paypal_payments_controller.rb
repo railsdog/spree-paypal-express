@@ -11,8 +11,9 @@ class Admin::PaypalPaymentsController < Admin::BaseController
 
   def country_changed
   end
-         
-  include Spree::PaypalExpress::Gateway
+        
+  # to allow capture (NB also included in order controller...)
+  include Spree::PaypalExpress
 
   def capture
     if !@order.paypal_payments.empty? && (payment = @order.paypal_payments.last).can_capture?
