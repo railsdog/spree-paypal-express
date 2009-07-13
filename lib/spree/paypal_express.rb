@@ -9,9 +9,9 @@ module Spree::PaypalExpress
 
       #:page_style             => "foobar", # merchant account can set named config
       :header_image            => "https://" + Spree::Config[:site_url] + "/images/logo.png", 
-      :background_color        => "e1e1e1",  # must be hex only, six chars
+      :background_color        => "ffffff",  # must be hex only, six chars
       :header_background_color => "ffffff",  
-      :header_border_color     => "00735a", 
+      :header_border_color     => "ffffff", 
 
       :allow_note              => true,
       :locale                  => Spree::Config[:default_locale],
