@@ -80,6 +80,7 @@ module Spree::PaypalExpress
   def paypal_checkout
     # need build etc? at least to finalise the total?
     gateway = paypal_gateway
+    order.update_totals
   
     opts = all_opts(@order)
     response = gateway.setup_authorization(opts[:money], opts)
@@ -104,15 +105,21 @@ module Spree::PaypalExpress
     order.checkout.special_instructions = info.params["note"]
 
     ship_address = info.address
-    order_ship_address = Address.create :firstname  => info.params["first_name"],
-                                        :lastname   => info.params["last_name"],
-                                        :address1   => ship_address["address1"],
-                                        :address2   => ship_address["address2"],
-                                        :city       => ship_address["city"],
-                                        :state      => State.find_by_name(ship_address["state"]),
-                                        :country    => Country.find_by_iso(ship_address["country"]),
-                                        :zipcode    => ship_address["zip"],
-                                        :phone      => ship_address["phone"] || "(not given)"
+    order_ship_address = Address.new :firstname  => info.params["first_name"],
+                                     :lastname   => info.params["last_name"],
+                                     :address1   => ship_address["address1"],
+                                     :address2   => ship_address["address2"],
+                                     :city       => ship_address["city"],
+                                     :country    => Country.find_by_iso(ship_address["country"]),
+                                     :zipcode    => ship_address["zip"],
+                                     :phone      => ship_address["phone"] || "(not given)"
+
+    if (state = State.find_by_name(ship_address["state"])
+      order_ship_address.state = state
+    else
+      order_ship_address.state_name = ship_address["state"]
+    end
+    order_ship_address.save!
 
     order.checkout.update_attributes :ship_address    => order_ship_address,
                                      :shipping_method => ShippingMethod.first          # TODO: refine/choose
