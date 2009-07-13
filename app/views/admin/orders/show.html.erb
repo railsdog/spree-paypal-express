@@ -11,7 +11,7 @@
   <div class='adr'>
     <%# look at the most recent (= up to date) payment %>
     <% payment = @order.payments.last %>
-    <% if payment.class == "CreditcardPayment" %>
+    <% if payment.class == CreditcardPayment %>
       <h4><%= link_to t("bill_address"), edit_admin_order_creditcard_payment_url(@order, payment) %></h4>
       <%= render :partial => 'admin/shared/address', :locals => {:address => @order.bill_address} %>      
     <% else %>
