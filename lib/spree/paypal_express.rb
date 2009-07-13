@@ -80,7 +80,7 @@ module Spree::PaypalExpress
   def paypal_checkout
     # need build etc? at least to finalise the total?
     gateway = paypal_gateway
-    order.update_totals
+    @order.update_totals
   
     opts = all_opts(@order)
     response = gateway.setup_authorization(opts[:money], opts)
