@@ -114,7 +114,7 @@ module Spree::PaypalExpress
                                      :zipcode    => ship_address["zip"],
                                      :phone      => ship_address["phone"] || "(not given)"
 
-    if (state = State.find_by_name(ship_address["state"])
+    if (state = State.find_by_name(ship_address["state"]))
       order_ship_address.state = state
     else
       order_ship_address.state_name = ship_address["state"]
