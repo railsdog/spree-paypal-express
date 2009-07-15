@@ -123,4 +123,6 @@ have not tried to use this yet.
 
   4. Get some of my code into active merchant
 
+  5. Double-check implementation of the full PPX process
+
 
