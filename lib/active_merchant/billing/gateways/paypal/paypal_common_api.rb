@@ -345,16 +345,6 @@ module ActiveMerchant #:nodoc:
       def commit(action, request)
         response = parse(action, ssl_post(endpoint_url, build_request(request)))
 
-        File.open("/tmp/paypal", "a") do |f|
-          f.puts "\n\n\n ************** #{Time.now}\n"
-          f.puts endpoint_url.inspect
-          f.puts "\n\n"
-          f.puts request.to_yaml
-          f.puts "\n\n"
-          f.puts response.to_yaml
-          f.puts "\n\n"
-        end
-       
         build_response(successful?(response), message_from(response), response,
     	    :test => test?,
     	    :authorization => authorization_from(response),
