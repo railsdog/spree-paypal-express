@@ -291,7 +291,7 @@ module ActiveMerchant #:nodoc:
 
       def add_payment_detail_item(xml, item)
         currency_code = options[:currency] || currency(item[:amount])
-        xml.tag! 'n2:PaymentDetailItem' do
+        xml.tag! 'n2:PaymentDetailsItem' do
           xml.tag! 'n2:Name',        item[:name]        unless item[:name].blank?
           xml.tag! 'n2:Description', item[:description] unless item[:description].blank?
           xml.tag! 'n2:Number',      item[:sku]         unless item[:sku].blank?
@@ -323,10 +323,9 @@ module ActiveMerchant #:nodoc:
           end
                
           # don't enforce inclusion yet - see how it works
-          xml.tag! 'n2:InsuranceOptionOffered', options[:insurance_offered] ? '1' : '0'
+          xml.tag! 'n2:InsuranceOptionOffered', options[:insurance_offered] ? '1' : '0' unless options[:insurance_offered].blank?
           xml.tag! 'n2:InsuranceTotal', amount(options[:insurance]), 'currencyID' => currency_code unless options[:insurance].blank?
           xml.tag! 'n2:ShippingDiscount', amount(options[:ship_discount]), 'currencyID' => currency_code unless options[:ship_discount].blank?
-
 
           # query - use slices too? or just risk reject? (QQ: injection risk???)
           xml.tag! 'n2:OrderDescription', options[:description] unless options[:description].blank?
