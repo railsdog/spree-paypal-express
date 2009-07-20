@@ -63,7 +63,7 @@ module Spree::PaypalExpress
   # expects the sale price from the line_item and the variant itself, since
   #   line_item price and variant price can diverge in time
   def paypal_variant_tax(sale_price, variant) 
-    {}
+    0.0
   end 
 
   # hook for easy site configuration, needs to return a hash
@@ -204,7 +204,8 @@ module Spree::PaypalExpress
     rescue ArgumentError => err
       raise ArgumentError.new(<<"EOM" + err.message)
 Problem with configuring Paypal Express Gateway:
-  You need to ensure that hook "paypal_site_options" sets values for login, password, and signature.
+You need to ensure that hook "paypal_site_options" sets values for login, password, and signature.
+It currently produces: #{paypal_site_options.inspect}
 EOM
     end 
 
