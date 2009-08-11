@@ -118,7 +118,9 @@ module Spree::PaypalExpress
   end
 
   def paypal_finish
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order)
+    order = Order.find_by_number(params[:id])
+
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(order)
     gateway = paypal_gateway
     info = gateway.details_for params[:token]
     response = gateway.authorize(opts[:money], opts)
@@ -126,7 +128,6 @@ module Spree::PaypalExpress
     gateway_error(response) unless response.success?
 
     # now save info
-    order = Order.find_by_number(params[:id])
     order.checkout.email = info.email
     order.checkout.special_instructions = info.params["note"]
 
@@ -172,9 +173,9 @@ module Spree::PaypalExpress
 
     flash[:notice] = t('order_processed_successfully')
     order_params = {:checkout_complete => true}
-    order_params[:order_token] = @order.token unless @order.user
-    session[:order_id] = nil if @order.checkout.completed_at
-    redirect_to order_url(@order, order_params) 
+    order_params[:order_token] = order.token unless order.user
+    session[:order_id] = nil if order.checkout.completed_at
+    redirect_to order_url(order, order_params) 
   end 
 
   def do_capture(authorization)
