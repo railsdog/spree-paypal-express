@@ -1,0 +1,55 @@
+example of an info fetch, for reference
+                                                                            
+PPPPPPPPPPPPP #<ActiveMerchant::Billing::PaypalExpressResponse:0x7f020cb75f60 
+  
+  @fraud_review=false, 
+  @avs_result={"code"=>nil, "postal_match"=>nil, "street_match"=>nil, "message"=>nil}, 
+
+  @params={"country_name"=>"United Kingdom"
+   "name"=>"Test User"
+   "city_name"=>"Wolverhampton"
+   "insurance_option_selected"=>"false"
+   "insurance_total"=>"0.00"
+   "shipping_total_currency_id"=>"GBP"
+   "insurance_option_offered"=>"false"
+   "payer"=>"paulcc_1247500933_per@gmail.com"
+   "address_owner"=>"PayPal"
+   "payer_country"=>"GB"
+   "timestamp"=>"2009-08-11T08:12:11Z"
+   "correlation_id"=>"ed7b386bb3c6e"
+   "country"=>"GB"
+   "token"=>"EC-32483953BF188421W"
+   "street1"=>"1 Main Terrace"
+   "handling_total"=>"0.00"
+   "shipping_calculation_mode"=>"Callback"
+   "postal_code"=>"W12 4LQ"
+   "payer_business"=>nil, "salutation"=>nil, "invoice_id"=>"R884242533"
+   "street2"=>nil, "external_address_id"=>nil, "tax_total"=>"6.00"
+   "build"=>"997644"
+   "address_id"=>nil, "shipping_discount_currency_id"=>"GBP"
+   "version"=>"57.0"
+   "shipping_option_name"=>nil, "tax_total_currency_id"=>"GBP"
+   "shipping_discount"=>"0.00"
+   "payer_id"=>"QWVRDBQ88DR7N"
+   "shipping_option_is_default"=>"false"
+   "last_name"=>"User"
+   "address_status"=>"Confirmed"
+   "phone"=>nil, "payer_status"=>"unverified"
+   "custom"=>"R884242533"
+   "suffix"=>nil, "order_total"=>"39.99"
+   "order_total_currency_id"=>"GBP"
+   "order_description"=>"Goods from a Spree-based site"
+   "insurance_total_currency_id"=>"GBP"
+   "handling_total_currency_id"=>"GBP"
+   "ack"=>"Success"
+   "middle_name"=>nil, "state_or_province"=>"West Midlands"
+   "shipping_total"=>"0.00"
+   "first_name"=>"Test"}, 
+
+  @test=true, 
+  @authorization=nil, 
+  @message="Success", 
+  @success=true, 
+  @cvv_result={"code"=>nil, "message"=>nil}>                                           
+
+
