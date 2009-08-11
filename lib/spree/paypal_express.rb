@@ -122,9 +122,11 @@ module Spree::PaypalExpress
 
     opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(order)
     gateway = paypal_gateway
-    info = gateway.details_for params[:token]
-    response = gateway.authorize(opts[:money], opts)
 
+    info = gateway.details_for params[:token]
+    gateway_error(info) unless info.success?
+
+    response = gateway.authorize(opts[:money], opts)
     gateway_error(response) unless response.success?
 
     # now save info
@@ -139,7 +141,8 @@ module Spree::PaypalExpress
                                      :city       => ship_address["city"],
                                      :country    => Country.find_by_iso(ship_address["country"]),
                                      :zipcode    => ship_address["zip"],
-                                     :phone      => ship_address["phone"] || "(not given)"
+                                     # phone is currently blanked in AM's PPX response lib
+                                     :phone      => info.params["phone"] || "(not given)"
 
     if (state = State.find_by_name(ship_address["state"]))
       order_ship_address.state = state
