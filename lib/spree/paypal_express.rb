@@ -93,8 +93,8 @@ module Spree::PaypalExpress
     # paypal expects this sum to work out (TODO: shift to AM code? and throw wobbly?)
     # there might be rounding issues when it comes to tax, though you can capture slightly extra
     opts[:money] = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
-    if opts[:money] != spree_total
-      raise "Ouch - precision problems: #{opts[:money]} vs #{spree_total}"
+    if (opts[:money].to_f - spree_total.to_f).abs > 0.01
+      raise "Ouch - precision problems: #{opts[:money].to_f} vs #{spree_total.to_f}, diff #{opts[:money].to_f - spree_total.to_f}"
     end
 
     # prepare the numbers for the gateway
