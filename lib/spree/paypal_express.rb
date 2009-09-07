@@ -29,16 +29,17 @@ module Spree::PaypalExpress
     }
   end           
 
-  # TODO: generalise the tax and shipping calcs
-  # might be able to get paypal to do some of the shipping choice and costing
+  # TODO: might be able to get paypal to do some of the shipping choice and costing
   def order_opts(order)
     items = order.line_items.map do |item|
               tax = paypal_variant_tax(item.price, item.variant)
+              price = (item.price * 100).to_i # convert for gateway
+              tax   = (tax        * 100).to_i # truncate the tax slice
               { :name        => item.variant.product.name,
                 :description => item.variant.product.description[0..120],
                 :sku         => item.variant.sku,
                 :qty         => item.quantity, 
-                :amount      => item.price - tax,   # TODO: test if ok on multi-qty orders
+                :amount      => price - tax,   
                 :tax         => tax,
                 :weight      => item.variant.weight,
                 :height      => item.variant.height,
@@ -52,9 +53,6 @@ module Spree::PaypalExpress
              :custom            => order.number,
 
              :items    => items,
-             :subtotal => items.map {|i| i[:amount] * i[:qty] }.sum,
-             :tax      => items.map {|i| i[:tax] * i[:qty]}.sum
-
            }
     opts
   end
@@ -86,20 +84,26 @@ module Spree::PaypalExpress
                       merge(paypal_shipping_and_handling_costs order).
                       merge(paypal_site_options                order)
 
-    # add the shipping and handling estimates to spree's order total
-    # (spree won't add them yet, since we've not officially chosen the shipping method)
-    spree_total = order.total + opts[:shipping] + opts[:handling]
+    # get the main totals from the items (already *100)
+    opts[:subtotal] = opts[:items].map {|i| i[:amount] * i[:qty] }.sum
+    opts[:tax]      = opts[:items].map {|i| i[:tax]    * i[:qty] }.sum  
 
-    # paypal expects this sum to work out (TODO: shift to AM code? and throw wobbly?)
-    # there might be rounding issues when it comes to tax, though you can capture slightly extra
-    opts[:money] = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
-    if (opts[:money].to_f - spree_total.to_f).abs > 0.01
-      raise "Ouch - precision problems: #{opts[:money].to_f} vs #{spree_total.to_f}, diff #{opts[:money].to_f - spree_total.to_f}"
-    end
+    # prepare the shipping and handling costs 
+    [:shipping, :handling].each {|amt| opts[amt] *= 100 }
 
-    # prepare the numbers for the gateway
-    [:money, :subtotal, :shipping, :handling, :tax].each {|amt| opts[amt] *= 100}
-    opts[:items].each {|item| [:amount,:tax].each {|amt| item[amt] *= 100} }
+    # overall total
+    opts[:money]    = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
+
+    # # add the shipping and handling estimates to spree's order total
+    # # (spree won't add them yet, since we've not officially chosen the shipping method)
+    # spree_total = order.total + opts[:shipping] + opts[:handling]
+    # # paypal expects this sum to work out (TODO: shift to AM code? and throw wobbly?)
+    # # there might be rounding issues when it comes to tax, though you can capture slightly extra
+    # if opts[:money] != spree_total
+    #   raise "Ouch - precision problems: #{opts[:money]} vs #{spree_total}"
+    # if (opts[:money].to_f - spree_total.to_f).abs > 0.01
+    #   raise "Ouch - precision problems: #{opts[:money].to_f} vs #{spree_total.to_f}, diff #{opts[:money].to_f - spree_total.to_f}"
+    # end
 
     # suggest current user's email or any email stored in the order
     opts[:email] = current_user ? current_user.email : order.checkout.email
