@@ -112,6 +112,10 @@ module Spree::PaypalExpress
   end
 
   def paypal_checkout
+    # fix a shipping method if not already done - DISABLE - avoid spree totals interference
+    # @order.checkout.shipment.shipping_method ||= ShippingMethod.first          
+    # @order.checkout.shipment.save
+
     opts = all_opts(@order)
     gateway = paypal_gateway
     response = gateway.setup_authorization(opts[:money], opts)
@@ -157,16 +161,13 @@ module Spree::PaypalExpress
     order_ship_address.save!
 
     # TODO: refine/choose the shipping method via paypal, or in advance
-    order.checkout.shipment.update_attributes :address    => order_ship_address,
-                                              :shipping_method => ShippingMethod.first          
+    order.checkout.shipment.update_attributes :address    => order_ship_address
 
 
     # now do the authorization and build the record of payment
     # use the info total from paypal, in case the user has changed their order
-    response = gateway.authorize(info.params["order_total"], opts)
+    response = gateway.authorize(opts[:money], opts)
     gateway_error(response) unless response.success?
-
-    logger.unknown("Paypal auth: order tot #{order.total} vs info total #{info.params["order_total"]} vs gross #{response.params["gross_amount"]}")
 
     fake_card = Creditcard.new :checkout       => order.checkout,
                                :cc_type        => "visa",   # fixed set of labels here
@@ -175,14 +176,18 @@ module Spree::PaypalExpress
                                :first_name     => info.params["first_name"], 
                                :last_name      => info.params["last_name"],
                                :display_number => "paypal:" + info.payer_id
-    payment = order.paypal_payments.create(:amount => response.params["gross_amount"].to_i,
+    payment = order.paypal_payments.create(:amount => response.params["gross_amount"].to_f,
                                            :creditcard => fake_card)
 
     # query - need 0 in amount for an auth? see main code
-    transaction = CreditcardTxn.new( :amount => response.params["gross_amount"].to_i,
+    transaction = CreditcardTxn.new( :amount => response.params["gross_amount"].to_f,
                                      :response_code => response.authorization,
                                      :txn_type => CreditcardTxn::TxnType::AUTHORIZE)
     payment.creditcard_txns << transaction
+
+    # save this for future reference
+    order.checkout.shipment.shipping_method ||= ShippingMethod.first          
+    order.checkout.shipment.save
 
     order.save!
     order.complete  # get return of status? throw of problems??? else weak go-ahead
