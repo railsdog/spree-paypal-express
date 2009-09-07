@@ -101,7 +101,13 @@ These were discussed in the customization section above, but for reference, they
 It is important to note that Spree won't have selected a shipping method when the PPX process
 is started. My sites only have a single shipping method, so I can get away with defaulting to
 that method and using that for calculations. It also means that I've not written any code yet 
-for selecting from applicable methods etc etc. 
+for selecting from applicable methods etc etc.
+
+Beware that this code does make some big assumptions about shipping. In particular, it AVOIDS 
+use of the Spree shipping calcs, effectively performing its own calcs (via the hook), but then 
+assigning the first shipping method at the end, just so order display will work. This stuff 
+is ok when there's a single shipping option defined (like me), but will need work if you have 
+more options. 
 
 Note that PPX allows you to capture up to 115% of the original authorized amount: this could 
 allow some flexibility in shipping choices, eg you could add a stage after return from PPX 
@@ -125,4 +131,4 @@ have not tried to use this yet.
 
   5. Double-check implementation of the full PPX process
 
-
+  6. Look at shipping method selection integration 
