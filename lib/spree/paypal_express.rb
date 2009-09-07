@@ -130,13 +130,14 @@ module Spree::PaypalExpress
     info = gateway.details_for params[:token]
     gateway_error(info) unless info.success?
 
-    response = gateway.authorize(opts[:money], opts)
-    gateway_error(response) unless response.success?
 
-    # now save info
+    # now save the order info
     order.checkout.email = info.email
     order.checkout.special_instructions = info.params["note"]
+    order.checkout.save
+    order.update_attribute(:user, current_user)
 
+    # save the address info
     ship_address = info.address
     order_ship_address = Address.new :firstname  => info.params["first_name"],
                                      :lastname   => info.params["last_name"],
@@ -155,29 +156,38 @@ module Spree::PaypalExpress
     end
     order_ship_address.save!
 
-    order.checkout.update_attributes :ship_address    => order_ship_address,
-                                     :shipping_method => ShippingMethod.first          # TODO: refine/choose
+    # TODO: refine/choose the shipping method via paypal, or in advance
+    order.checkout.shipment.update_attributes :address    => order_ship_address,
+                                              :shipping_method => ShippingMethod.first          
+
+
+    # now do the authorization and build the record of payment
+    # use the info total from paypal, in case the user has changed their order
+    response = gateway.authorize(info.params["order_total"], opts)
+    gateway_error(response) unless response.success?
+
+    logger.unknown("Paypal auth: order tot #{order.total} vs info total #{info.params["order_total"]} vs gross #{response.params["gross_amount"]}")
 
     fake_card = Creditcard.new :checkout       => order.checkout,
-                               :cc_type        => "visa",   # hands are tied
+                               :cc_type        => "visa",   # fixed set of labels here
                                :month          => Time.now.month, 
                                :year           => Time.now.year, 
                                :first_name     => info.params["first_name"], 
                                :last_name      => info.params["last_name"],
                                :display_number => "paypal:" + info.payer_id
-    payment = order.paypal_payments.create(:amount => response.params["gross_amount"].to_i || 999, 
+    payment = order.paypal_payments.create(:amount => response.params["gross_amount"].to_i,
                                            :creditcard => fake_card)
 
     # query - need 0 in amount for an auth? see main code
-    transaction = CreditcardTxn.new( :amount => response.params["gross_amount"].to_i || 999,
+    transaction = CreditcardTxn.new( :amount => response.params["gross_amount"].to_i,
                                      :response_code => response.authorization,
                                      :txn_type => CreditcardTxn::TxnType::AUTHORIZE)
     payment.creditcard_txns << transaction
 
-    order.user = current_user
     order.save!
     order.complete  # get return of status? throw of problems??? else weak go-ahead
 
+    # todo - share code
     flash[:notice] = t('order_processed_successfully')
     order_params = {:checkout_complete => true}
     order_params[:order_token] = order.token unless order.user
