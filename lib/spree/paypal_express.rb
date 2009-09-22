@@ -212,6 +212,7 @@ module Spree::PaypalExpress
     payment.txns << CreditcardTxn.new( :amount        => authorization.amount,
                                        :response_code => response.authorization,
                                        :txn_type      => CreditcardTxn::TxnType::CAPTURE )
+    payment.save
   end 
 
 
