@@ -7,21 +7,25 @@ module ActiveMerchant #:nodoc:
     class PaypalExpressGateway < Gateway
       include PaypalCommonAPI
       include PaypalExpressCommon
-      
+
       self.test_redirect_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token='
       self.supported_countries = ['US']
       self.homepage_url = 'https://www.paypal.com/cgi-bin/webscr?cmd=xpt/merchant/ExpressCheckoutIntro-outside'
       self.display_name = 'PayPal Express Checkout'
-      
+
       def setup_authorization(money, options = {})
         requires!(options, :return_url, :cancel_return_url)
-        
-        commit 'SetExpressCheckout', build_setup_request('Authorization', money, options)
+
+        req = build_setup_request('Authorization', money, options)
+
+        puts req
+
+        commit 'SetExpressCheckout', req
       end
-      
+
       def setup_purchase(money, options = {})
         requires!(options, :return_url, :cancel_return_url)
-        
+
         commit 'SetExpressCheckout', build_setup_request('Sale', money, options)
       end
 
@@ -31,13 +35,17 @@ module ActiveMerchant #:nodoc:
 
       def authorize(money, options = {})
         requires!(options, :token, :payer_id)
-      
-        commit 'DoExpressCheckoutPayment', build_sale_or_authorization_request('Authorization', money, options)
+
+        req = build_sale_or_authorization_request('Authorization', money, options)
+
+      puts req
+
+        commit 'DoExpressCheckoutPayment', req
       end
 
       def purchase(money, options = {})
         requires!(options, :token, :payer_id)
-        
+
         commit 'DoExpressCheckoutPayment', build_sale_or_authorization_request('Sale', money, options)
       end
 
@@ -53,10 +61,10 @@ module ActiveMerchant #:nodoc:
 
         xml.target!
       end
-      
+
       def build_sale_or_authorization_request(action, money, options)
         currency_code = options[:currency] || currency(money)
-        
+
         xml = Builder::XmlMarkup.new :indent => 2
         xml.tag! 'DoExpressCheckoutPaymentReq', 'xmlns' => PAYPAL_NAMESPACE do
           xml.tag! 'DoExpressCheckoutPaymentRequest', 'xmlns:n2' => EBAY_NAMESPACE do
@@ -84,16 +92,16 @@ module ActiveMerchant #:nodoc:
               end
               xml.tag! 'n2:ReturnURL', options[:return_url]
               xml.tag! 'n2:CancelURL', options[:cancel_return_url]
-              xml.tag! 'n2:CallbackURL', options[:callback_url] unless options[:callback_url].blank?
-              xml.tag! 'n2:CallbackTimeout', options[:callback_timeout] unless options[:callback_timeout].blank?
-              # flat rate shipping options -- required if using callback, TODO
+              # xml.tag! 'n2:CallbackURL', options[:callback_url] unless options[:callback_url].blank?
+              # xml.tag! 'n2:CallbackTimeout', options[:callback_timeout] unless options[:callback_timeout].blank?
               xml.tag! 'n2:ReqConfirmShipping', options[:req_confirm_shipping] ? '1' : '0'
               xml.tag! 'n2:NoShipping', options[:no_shipping] ? '1' : '0'
-              # NOT INCLUDED IN SETUP -- GRAB ELSEWHERE? -- xml.tag! 'n2:IPAddress', options[:ip]
+              ## add flat rates for shipping
+              # add_shipping_options(xml, options[:shipping_options], options) if options[:shipping_options]
               xml.tag! 'n2:AllowNote', options[:allow_note] ? '1' : '0'
               xml.tag! 'n2:AddressOverride', options[:address_override] ? '1' : '0' # force yours
               xml.tag! 'n2:LocaleCode', options[:locale] unless options[:locale].blank?
-              
+
               # Customization of the payment page
               xml.tag! 'n2:PageStyle', options[:page_style] unless options[:page_style].blank?
               xml.tag! 'n2:cpp-header-image', options[:header_image] unless options[:header_image].blank?
@@ -120,7 +128,7 @@ module ActiveMerchant #:nodoc:
 
         xml.target!
       end
-      
+
       def build_response(success, message, response, options = {})
         PaypalExpressResponse.new(success, message, response, options)
       end

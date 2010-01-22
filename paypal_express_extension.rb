@@ -6,25 +6,18 @@ class PaypalExpressExtension < Spree::Extension
   description "Describe your extension here"
   url "http://yourwebsite.com/paypal_express"
 
-  # Please use paypal_express/config/routes.rb instead for extension routes.
-
-  # def self.require_gems(config)
-  #   config.gem "gemname-goes-here", :version => '1.2.3'
-  # end
-  
   def activate
-    # admin.tabs.add "Paypal Express", "/admin/paypal_express", :after => "Layouts", :visibility => [:all]
-   
+    BillingIntegration::PaypalExpress.register
+
     # Load up over-rides for ActiveMerchant files
     # these will be submitted to ActiveMerchant some time...
     require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal", "paypal_common_api.rb")
     require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal_express_uk.rb")
     require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal_express_uk.rb")
 
-   
-    # inject paypal code into orders controller 
+
+    # inject paypal code into orders controller
     OrdersController.class_eval do
-      ssl_required :paypal_checkout, :paypal_finish
       include Spree::PaypalExpress
     end
 

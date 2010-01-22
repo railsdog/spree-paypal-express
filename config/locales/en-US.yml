@@ -1,9 +1,9 @@
 ---
-en-GB:
+en-US:
   edit_paypal_info: Edit Paypal Express Payment
   paypal_payment: Paypal Express Payment
   paypal_txn_id: Transaction Code
   paypal_capture_complete: Paypal Transaction has been captured.
   unable_to_capture_paypal: Unable to capture Paypal Transaction.
   signature: Signature
-
+  order_not_yet_placed: "Your order has <strong>not</strong> been be placed, please review the details and click Confirm below to finalise your order."
