@@ -8,6 +8,7 @@ class PaypalExpressExtension < Spree::Extension
 
   def activate
     BillingIntegration::PaypalExpress.register
+    BillingIntegration::PaypalExpressUk.register
 
     # Load up over-rides for ActiveMerchant files
     # these will be submitted to ActiveMerchant some time...
@@ -17,7 +18,7 @@ class PaypalExpressExtension < Spree::Extension
 
 
     # inject paypal code into orders controller
-    OrdersController.class_eval do
+    CheckoutsController.class_eval do
       include Spree::PaypalExpress
     end
 

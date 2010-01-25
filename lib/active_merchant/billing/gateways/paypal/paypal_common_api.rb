@@ -8,41 +8,43 @@ module ActiveMerchant #:nodoc:
         base.cattr_accessor :signature
       end
 
-      API_VERSION = '60.0'    # TODO - check absolute adherence in this file, override in sub?
+      silence_warnings do
+        API_VERSION = '60.0'
 
-      URLS = {
-        :test => { :certificate => 'https://api.sandbox.paypal.com/2.0/',
-                   :signature   => 'https://api-3t.sandbox.paypal.com/2.0/' },
-        :live => { :certificate => 'https://api-aa.paypal.com/2.0/',
-                   :signature   => 'https://api-3t.paypal.com/2.0/' }
-      }
+        URLS = {
+          :test => { :certificate => 'https://api.sandbox.paypal.com/2.0/',
+                     :signature   => 'https://api-3t.sandbox.paypal.com/2.0/' },
+          :live => { :certificate => 'https://api-aa.paypal.com/2.0/',
+                     :signature   => 'https://api-3t.paypal.com/2.0/' }
+        }
 
-      PAYPAL_NAMESPACE = 'urn:ebay:api:PayPalAPI'
-      EBAY_NAMESPACE = 'urn:ebay:apis:eBLBaseComponents'
+        PAYPAL_NAMESPACE = 'urn:ebay:api:PayPalAPI'
+        EBAY_NAMESPACE = 'urn:ebay:apis:eBLBaseComponents'
 
-      ENVELOPE_NAMESPACES = { 'xmlns:xsd' => 'http://www.w3.org/2001/XMLSchema',
-                              'xmlns:env' => 'http://schemas.xmlsoap.org/soap/envelope/',
-                              'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance'
-                            }
-      CREDENTIALS_NAMESPACES = { 'xmlns' => PAYPAL_NAMESPACE,
-                                 'xmlns:n1' => EBAY_NAMESPACE,
-                                 'env:mustUnderstand' => '0'
-                               }
+        ENVELOPE_NAMESPACES = { 'xmlns:xsd' => 'http://www.w3.org/2001/XMLSchema',
+                                'xmlns:env' => 'http://schemas.xmlsoap.org/soap/envelope/',
+                                'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance'
+                              }
+        CREDENTIALS_NAMESPACES = { 'xmlns' => PAYPAL_NAMESPACE,
+                                   'xmlns:n1' => EBAY_NAMESPACE,
+                                   'env:mustUnderstand' => '0'
+                                 }
 
-      AUSTRALIAN_STATES = {
-        'ACT' => 'Australian Capital Territory',
-        'NSW' => 'New South Wales',
-        'NT'  => 'Northern Territory',
-        'QLD' => 'Queensland',
-        'SA'  => 'South Australia',
-        'TAS' => 'Tasmania',
-        'VIC' => 'Victoria',
-        'WA'  => 'Western Australia'
-      }
+        AUSTRALIAN_STATES = {
+          'ACT' => 'Australian Capital Territory',
+          'NSW' => 'New South Wales',
+          'NT'  => 'Northern Territory',
+          'QLD' => 'Queensland',
+          'SA'  => 'South Australia',
+          'TAS' => 'Tasmania',
+          'VIC' => 'Victoria',
+          'WA'  => 'Western Australia'
+        }
 
-      SUCCESS_CODES = [ 'Success', 'SuccessWithWarning' ]
+        SUCCESS_CODES = [ 'Success', 'SuccessWithWarning' ]
 
-      FRAUD_REVIEW_CODE = "11610"
+        FRAUD_REVIEW_CODE = "11610"
+      end
 
       # The gateway must be configured with either your PayPal PEM file
       # or your PayPal API Signature.  Only one is required.
@@ -314,8 +316,6 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'n2:OrderTotal', amount(money), 'currencyID' => currency_code
 
           # All of the values must be included together and add up to the order total
-          puts "-----------#{options[:shipping]}---------------------#{amount(options[:shipping])}----------------"
-
           if [:subtotal, :shipping, :handling, :tax].all?{ |o| options.has_key?(o) }
             xml.tag! 'n2:ItemTotal', amount(options[:subtotal]), 'currencyID' => currency_code
             xml.tag! 'n2:ShippingTotal', amount(options[:shipping]),'currencyID' => currency_code

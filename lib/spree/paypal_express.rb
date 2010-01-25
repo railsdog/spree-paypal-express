@@ -4,8 +4,9 @@ module Spree::PaypalExpress
   include ActiveMerchant::RequiresParameters
 
   def paypal_checkout
+    load_object
     opts = all_opts(@order, 'checkout')
-    opts.merge!(address_and_selected_shipping_options(@order))
+    opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
     response = gateway.setup_authorization(opts[:money], opts)
@@ -19,8 +20,9 @@ module Spree::PaypalExpress
   end
 
   def paypal_payment
+    load_object
     opts = all_opts(@order, 'payment')
-    opts.merge!(address_and_selected_shipping_options(@order))
+    opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
     response = gateway.setup_authorization(opts[:money], opts)
@@ -34,15 +36,13 @@ module Spree::PaypalExpress
   end
 
   def paypal_confirm
-    @order = Order.find_by_number(params[:id])
+    load_object
 
     opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order)
     gateway = paypal_gateway
 
     @ppx_details = gateway.details_for params[:token]
     gateway_error(@ppx_details) unless @ppx_details.success?
-
-
 
     # now save the updated order info
     @order.checkout.email = @ppx_details.email
@@ -75,65 +75,64 @@ module Spree::PaypalExpress
   end
 
   def paypal_finish
-    order = Order.find_by_number(params[:id])
+    load_object
+    #order = Order.find_by_number(params[:id])
 
     opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order)
     gateway = paypal_gateway
 
+    if Spree::Config[:auto_capture]
+      ppx_auth_response = gateway.purchase((@order.total*100).to_i, opts)
+    else
+      ppx_auth_response = gateway.authorize((@order.total*100).to_i, opts)
+    end
 
-    ppx_auth_response = gateway.authorize((order.total*100).to_i, opts)
     gateway_error(ppx_auth_response) unless ppx_auth_response.success?
-    puts "------------------------------------------------"
-    puts ppx_auth_response.to_yaml
 
-    puts "-----#{ppx_auth_response.avs_result.class}--------------------------------#{ppx_auth_response.avs_result["code"]}-----------"
+    payment = @order.paypal_payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f)
 
-    payment = order.paypal_payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f)
-
-    # query - need 0 in amount for an auth? see main code
-    transaction = PaypalTxn.new (:paypal_payment => payment,
+    transaction = PaypalTxn.new(:paypal_payment => payment,
                                   :gross_amount   => ppx_auth_response.params["gross_amount"].to_f,
+                                  :message => ppx_auth_response.params["message "],
                                   :payment_status => ppx_auth_response.params["payment_status"],
                                   :pending_reason => ppx_auth_response.params["pending_reason"],
                                   :transaction_type => ppx_auth_response.params["transaction_type"],
                                   :payment_type => ppx_auth_response.params["payment_type"],
                                   :ack => ppx_auth_response.params["ack"],
-                                  :token => ppx_auth_response.params["token"])# ,
-                                  #                                   :avs_code => ppx_auth_response.params["avs_result"]["code"],
-                                  #                                   :cvv_code => ppx_auth_response.params["cvv_result"]["code"])
+                                  :token => ppx_auth_response.params["token"],
+                                  :avs_code => ppx_auth_response.avs_result["code"],
+                                  :cvv_code => ppx_auth_response.cvv_result["code"])
 
     payment.paypal_txns << transaction
 
-
-    # save this for future reference
-    # order.checkout.shipment.shipping_method ||= ShippingMethod.first
-    # order.checkout.shipment.save
-
-    order.save!
-    order.complete  # get return of status? throw of problems??? else weak go-ahead
+    @order.save!
+    @checkout.reload
+    until @checkout.state == "complete"
+      @checkout.next!
+    end
 
     # todo - share code
     flash[:notice] = t('order_processed_successfully')
     order_params = {:checkout_complete => true}
-    order_params[:order_token] = order.token unless order.user
-    session[:order_id] = nil if order.checkout.completed_at
-    redirect_to order_url(order, order_params)
+    order_params[:order_token] = @order.token unless @order.user
+    session[:order_id] = nil if @order.checkout.completed_at
+    redirect_to order_url(@order, order_params)
   end
 
-  def do_capture(authorization)
-    response = paypal_gateway.capture((100 * authorization.amount).to_i, authorization.response_code)
-
-    gateway_error(response) unless response.success?
-
-    # TODO needs to be cleaned up or recast...
-    payment = PaypalPayment.find(authorization.creditcard_payment_id)
-
-    # create a transaction to reflect the capture
-    payment.txns << CreditcardTxn.new( :amount        => authorization.amount,
-                                       :response_code => response.authorization,
-                                       :txn_type      => CreditcardTxn::TxnType::CAPTURE )
-    payment.save
-  end
+  # def do_capture(authorization)
+  #   response = paypal_gateway.capture((100 * authorization.amount).to_i, authorization.response_code)
+  #
+  #   gateway_error(response) unless response.success?
+  #
+  #   # TODO needs to be cleaned up or recast...
+  #   payment = PaypalPayment.find(authorization.creditcard_payment_id)
+  #
+  #   # create a transaction to reflect the capture
+  #   payment.txns << CreditcardTxn.new( :amount        => authorization.amount,
+  #                                      :response_code => response.authorization,
+  #                                      :txn_type      => CreditcardTxn::TxnType::CAPTURE )
+  #   payment.save
+  # end
 
   private
   def fixed_opts
@@ -175,7 +174,7 @@ module Spree::PaypalExpress
             end
 
 
-    opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/paypal_confirm",
+    opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/checkout/paypal_confirm",
              :cancel_return_url => "http://"  + request.host_with_port + "/orders/#{order.number}/edit",
              :order_id          => order.number,
              :custom            => order.number,
@@ -220,7 +219,7 @@ module Spree::PaypalExpress
     0.0
   end
 
-  def address_and_selected_shipping_options(order)
+  def address_options(order)
     {
       :no_shipping => false,
       :address_override => true,
@@ -288,7 +287,7 @@ module Spree::PaypalExpress
     integration = BillingIntegration.find(params[:integration_id]) if params.key? :integration_id
     integration ||= BillingIntegration.current
     gw_opts     = integration.options
-    logger.debug { "-----------#{integration.provider_class}-------------------------------------" }
+
     requires!(gw_opts, :login, :password, :signature)
 
     gateway = integration.provider_class.new(gw_opts)
