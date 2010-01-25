@@ -287,10 +287,9 @@ module Spree::PaypalExpress
   def paypal_gateway
     integration = BillingIntegration.find(params[:integration_id]) if params.key? :integration_id
     integration ||= BillingIntegration.current
-    gw_opts     = integration.options
 
-    requires!(gw_opts, :login, :password, :signature)
 
-    gateway = integration.provider_class.new(gw_opts)
+
+    gateway = integration.provider
   end
 end
