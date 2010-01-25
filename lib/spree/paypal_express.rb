@@ -252,25 +252,26 @@ module Spree::PaypalExpress
 
   # hook to allow applications to load in their own shipping and handling costs
   def flat_rate_shipping_and_handling_options(order, stage)
-    max_fallback = 0.0
-    shipping_options = ShippingMethod.all.map do |shipping_method|
-          max_fallback = shipping_method.fallback_amount if shipping_method.fallback_amount > max_fallback
-              { :name       => "#{shipping_method.id}",
-                :label       => "#{shipping_method.name} - #{shipping_method.zone.name}",
-                :amount      => (shipping_method.fallback_amount*100) + 1,
-                :default     => shipping_method.is_default }
-            end
-
-
-    default_shipping_method = ShippingMethod.find(:first, :conditions => {:is_default => true})
-
-    opts = { :shipping_options  => shipping_options,
-             :max_amount  => (order.total + max_fallback)*100
-           }
-
-    opts[:shipping] = (default_shipping_method.nil? ? 0 : default_shipping_method.fallback_amount) if stage == "checkout"
-
-    opts
+    # max_fallback = 0.0
+    # shipping_options = ShippingMethod.all.map do |shipping_method|
+    #       max_fallback = shipping_method.fallback_amount if shipping_method.fallback_amount > max_fallback
+    #           { :name       => "#{shipping_method.id}",
+    #             :label       => "#{shipping_method.name} - #{shipping_method.zone.name}",
+    #             :amount      => (shipping_method.fallback_amount*100) + 1,
+    #             :default     => shipping_method.is_default }
+    #         end
+    #
+    #
+    # default_shipping_method = ShippingMethod.find(:first, :conditions => {:is_default => true})
+    #
+    # opts = { :shipping_options  => shipping_options,
+    #          :max_amount  => (order.total + max_fallback)*100
+    #        }
+    #
+    # opts[:shipping] = (default_shipping_method.nil? ? 0 : default_shipping_method.fallback_amount) if stage == "checkout"
+    #
+    # opts
+    {}
   end
 
   def gateway_error(response)
