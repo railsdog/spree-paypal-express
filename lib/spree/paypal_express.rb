@@ -100,8 +100,8 @@ module Spree::PaypalExpress
                                   :payment_type => ppx_auth_response.params["payment_type"],
                                   :ack => ppx_auth_response.params["ack"],
                                   :token => ppx_auth_response.params["token"],
-                                  :avs_code => ppx_auth_response.avs_result["code"],
-                                  :cvv_code => ppx_auth_response.cvv_result["code"])
+                                  :avs_response => ppx_auth_response.avs_result["code"],
+                                  :cvv_response => ppx_auth_response.cvv_result["code"])
 
     payment.paypal_txns << transaction
 
