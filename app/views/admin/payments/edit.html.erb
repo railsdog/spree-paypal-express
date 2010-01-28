@@ -1,0 +1,121 @@
+<%= render :partial => 'admin/shared/order_tabs', :locals => {:current => "Payments"} %>
+
+<h2><%= t("activerecord.models.#{@object.class.to_s.underscore}.one") %></h2>
+
+<%=error_messages_for :creditcard_payment %>
+<% form_for(object, :url => object_url, :html => { :method => :put}) do |payment_form| %>
+<%= hidden_field_tag :payment_type, object.class.to_s.underscore %>
+
+  <p>
+    <label><%= t("amount") %>:</label></td>
+    <%= object.amount %>
+  </p>
+
+  <% if object.class == CreditcardPayment %>
+  <fieldset>
+    <legend><%= t('creditcard') %></legend>
+
+    <table class="index">
+      <tr>
+        <th colspan="6"><%= t('card_details') %></th>
+      </tr>
+      <tr>
+        <td><label><%= t("card_number") %>:</label></td>
+        <td>
+          XXXX-XXXX-XXXX-<%= object.creditcard.last_digits %>
+        </td>
+        <td><label><%= t("expiration") %>:</label></td>
+        <td>
+          <%= object.creditcard.month %>/<%= object.creditcard.year %>
+        </td>
+        <td><label><%= t("card_code") %>:</label></td>
+        <td>
+          <%= object.creditcard.verification_value %>
+        </td>
+      </tr>
+      <tr>
+        <td><label><%= t("maestro_or_solo_cards") %>:</label></td>
+        <td>
+          <%= object.creditcard.issue_number %>
+        </td>
+        <td><label><%= t('start_date') %>:</label></td>
+        <td colspan="3">
+          <%= object.creditcard.start_month %>/<%= object.creditcard.start_year %>
+        </td>
+      </tr>
+    </table>
+
+    <% payment_form.fields_for :order do |order_form|  %>
+      <% order_form.fields_for :checkout do |checkout_form|  %>
+
+        <% checkout_form.fields_for :bill_address do |ba_form|  %>
+          <%= render :partial => "admin/checkouts/address_form", :locals => {:f => ba_form, :name => t('billing_address')} %>
+        <% end %>
+
+      <% end %>
+    <% end %>
+
+  </fieldset>
+  <% end %>
+
+  <% if object.class == PaypalPayment %>
+  <fieldset>
+    <legend><%= t('paypal_payment') %></legend>
+
+    <% object.txns.reverse.each do |txn| %>
+      <table class="index">
+        <tr>
+          <th colspan="7"><%= t('transaction') %> <%= txn.transaction_id %> -  <%= txn.created_at.to_s(:date_time24) %></th>
+        </tr>
+        <tr>
+          <td width="12%;"><label><%= t("status") %>:</label></td>
+          <td width="20%;">
+            <%= txn.payment_status %>
+          </td>
+          <td width="8%;"><label><%= t("result") %>:</label></td>
+          <td width="20%;">
+            <%= txn.ack %>
+          </td>
+          <td width="15%;"><label><%= t("amount") %>:</label></td>
+          <td width="20%;">
+            <%= number_to_currency txn.gross_amount %>
+          </td>
+          <td width="10%;" rowspan="3">
+            <% if object.can_capture? %>
+              <%= link_to t("capture").titleize, capture_admin_order_paypal_payment_url(@order, object) %>
+            <% end %>
+            <%= link_to t("refund"), refund_admin_order_paypal_payment_url(@order, object) %>
+          </td>
+        </tr>
+        <tr>
+          <td><label><%= t("comment") %>:</label></td>
+          <td colspan="3">
+            <%= txn.message %>
+          </td>
+          <td><label><%= t("paypal_payment_id") %>:</label></td>
+          <td>
+            <%= txn.paypal_payment_id %>
+          </td>
+        </tr>
+        <% if txn.payment_status == "Pending" %>
+          <tr>
+            <td><label><%= t("pending_reason") %>:</label></td>
+            <td colspan="6">
+              <%= txn.pending_reason %>
+            </td>
+          </tr>
+        <% end %>
+      </table>
+    <% end %>
+
+  </fieldset>
+  <% end %>
+
+  <p class="form-buttons">
+    <%= button t('continue') %>
+  </p>
+
+<% end %>
+
+<%#= link_to t("capture").titleize, capture_admin_order_payment_url(@order, @creditcard_payment), :confirm => t('are_you_sure_you_want_to_capture') if object.can_capture?  %> &nbsp;
+

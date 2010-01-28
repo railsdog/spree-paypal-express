@@ -8,7 +8,7 @@ map.resources :paypal_express_callbacks, :only => [:index]
 
 map.namespace :admin do |admin|
   admin.resources :orders do |order|
-    order.resources :paypal_payments, :member => {:capture => :get}, :has_many => [:paypal_payments]
+    order.resources :paypal_payments, :member => {:capture => :get, :refund => :any}, :has_many => [:txns]
   end
 end
 

@@ -1,53 +1,43 @@
 class Admin::PaypalPaymentsController < Admin::BaseController
-  before_filter :load_data
-  before_filter :load_amount, :except => :country_changed
   resource_controller
   belongs_to :order
   ssl_required
 
-  update do
-    wants.html { redirect_to edit_object_url }
-  end
-
-  def country_changed
-  end
-        
-  # to allow capture (NB also included in order controller...)
+  # to allow capture (NB also included in checkout controller...)
   include Spree::PaypalExpress
 
   def capture
+    load_object
     if !@order.paypal_payments.empty? && (payment = @order.paypal_payments.last).can_capture?
 
-      do_capture(payment.find_authorization)
+      paypal_capture(payment.find_authorization)
 
       flash[:notice] = t("paypal_capture_complete")
     else
       flash[:error] = t("unable_to_capture_paypal")
     end
-    redirect_to edit_object_url
-  end 
+    redirect_to edit_admin_order_payment_url(@order, @paypal_payment)
+  end
 
-  private
-  def load_data 
+
+  def refund
     load_object
-    @selected_country_id = params[:payment_presenter][:address_country_id].to_i if params.has_key?('payment_presenter')
-    @selected_country_id ||= @order.bill_address.country_id if @order and @order.bill_address
-    @selected_country_id ||= Spree::Config[:default_country_id]
- 
-    @states = State.find_all_by_country_id(@selected_country_id, :order => 'name')  
-    @countries = Country.find(:all)
+    if params.has_key? :amount
+
+      if !@order.paypal_payments.empty?
+        payment = @order.paypal_payments.first
+
+        paypal_refund(payment.find_capture, params[:amount].to_f)
+
+        flash[:notice] = t("paypal_refund_complete")
+      else
+        flash[:error] = t("unable_to_refund_paypal")
+      end
+      redirect_to edit_admin_order_payment_url(@order, @paypal_payment)
+
+
+    end
   end
 
-  # what for?
-  def load_amount
-    @amount = params[:amount] || @order.total
-  end
-           
-  def build_object
-    @object ||= end_of_association_chain.send parent? ? :build : :new, object_params
-    # not relevant?
-    # @object.creditcard = Creditcard.new(:address => @object.order.bill_address.clone) unless @object.creditcard
-    @object
-  end
-  
+
 end

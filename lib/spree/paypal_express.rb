@@ -42,36 +42,39 @@ module Spree::PaypalExpress
     gateway = paypal_gateway
 
     @ppx_details = gateway.details_for params[:token]
-    gateway_error(@ppx_details) unless @ppx_details.success?
 
-    # now save the updated order info
-    @order.checkout.email = @ppx_details.email
-    @order.checkout.special_instructions = @ppx_details.params["note"]
+    if @ppx_details.success?
+      # now save the updated order info
+      @order.checkout.email = @ppx_details.email
+      @order.checkout.special_instructions = @ppx_details.params["note"]
 
-    @order.update_attribute(:user, current_user)
+      @order.update_attribute(:user, current_user)
 
-    ship_address = @ppx_details.address
-    order_ship_address = Address.new :firstname  => @ppx_details.params["first_name"],
-                                     :lastname   => @ppx_details.params["last_name"],
-                                     :address1   => ship_address["address1"],
-                                     :address2   => ship_address["address2"],
-                                     :city       => ship_address["city"],
-                                     :country    => Country.find_by_iso(ship_address["country"]),
-                                     :zipcode    => ship_address["zip"],
-                                     # phone is currently blanked in AM's PPX response lib
-                                     :phone      => @ppx_details.params["phone"] || "(not given)"
+      ship_address = @ppx_details.address
+      order_ship_address = Address.new :firstname  => @ppx_details.params["first_name"],
+                                       :lastname   => @ppx_details.params["last_name"],
+                                       :address1   => ship_address["address1"],
+                                       :address2   => ship_address["address2"],
+                                       :city       => ship_address["city"],
+                                       :country    => Country.find_by_iso(ship_address["country"]),
+                                       :zipcode    => ship_address["zip"],
+                                       # phone is currently blanked in AM's PPX response lib
+                                       :phone      => @ppx_details.params["phone"] || "(not given)"
 
-    if (state = State.find_by_abbr(ship_address["state"]))
-      order_ship_address.state = state
+      if (state = State.find_by_abbr(ship_address["state"]))
+        order_ship_address.state = state
+      else
+        order_ship_address.state_name = ship_address["state"]
+      end
+
+      order_ship_address.save!
+
+      @order.checkout.ship_address = order_ship_address
+      @order.checkout.save
+      render :partial => "shared/paypal_express_confirm", :layout => true
     else
-      order_ship_address.state_name = ship_address["state"]
+      gateway_error(@ppx_details)
     end
-
-    order_ship_address.save!
-
-    @order.checkout.ship_address = order_ship_address
-    @order.checkout.save
-    render :partial => "shared/paypal_express_confirm", :layout => true
   end
 
   def paypal_finish
@@ -87,52 +90,98 @@ module Spree::PaypalExpress
       ppx_auth_response = gateway.authorize((@order.total*100).to_i, opts)
     end
 
-    gateway_error(ppx_auth_response) unless ppx_auth_response.success?
+    if ppx_auth_response.success?
 
-    payment = @order.paypal_payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f)
+      payment = @order.paypal_payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f)
 
-    transaction = PaypalTxn.new(:paypal_payment => payment,
-                                  :gross_amount   => ppx_auth_response.params["gross_amount"].to_f,
-                                  :message => ppx_auth_response.params["message "],
-                                  :payment_status => ppx_auth_response.params["payment_status"],
-                                  :pending_reason => ppx_auth_response.params["pending_reason"],
-                                  :transaction_type => ppx_auth_response.params["transaction_type"],
-                                  :payment_type => ppx_auth_response.params["payment_type"],
-                                  :ack => ppx_auth_response.params["ack"],
-                                  :token => ppx_auth_response.params["token"],
-                                  :avs_response => ppx_auth_response.avs_result["code"],
-                                  :cvv_response => ppx_auth_response.cvv_result["code"])
+      transaction = PaypalTxn.new(:paypal_payment => payment,
+                                    :gross_amount   => ppx_auth_response.params["gross_amount"].to_f,
+                                    :message => ppx_auth_response.params["message"],
+                                    :payment_status => ppx_auth_response.params["payment_status"],
+                                    :pending_reason => ppx_auth_response.params["pending_reason"],
+                                    :transaction_id => ppx_auth_response.params["transaction_id"],
+                                    :transaction_type => ppx_auth_response.params["transaction_type"],
+                                    :payment_type => ppx_auth_response.params["payment_type"],
+                                    :ack => ppx_auth_response.params["ack"],
+                                    :token => ppx_auth_response.params["token"],
+                                    :avs_response => ppx_auth_response.avs_result["code"],
+                                    :cvv_response => ppx_auth_response.cvv_result["code"])
 
-    payment.paypal_txns << transaction
+      payment.paypal_txns << transaction
 
-    @order.save!
-    @checkout.reload
-    until @checkout.state == "complete"
-      @checkout.next!
+      @order.save!
+      @checkout.reload
+      until @checkout.state == "complete"
+        @checkout.next!
+      end
+
+      # todo - share code
+      flash[:notice] = t('order_processed_successfully')
+      order_params = {:checkout_complete => true}
+      order_params[:order_token] = @order.token unless @order.user
+      session[:order_id] = nil if @order.checkout.completed_at
+
+    else
+      order_params = {}
+      gateway_error(ppx_auth_response)
     end
 
-    # todo - share code
-    flash[:notice] = t('order_processed_successfully')
-    order_params = {:checkout_complete => true}
-    order_params[:order_token] = @order.token unless @order.user
-    session[:order_id] = nil if @order.checkout.completed_at
     redirect_to order_url(@order, order_params)
   end
 
-  # def do_capture(authorization)
-  #   response = paypal_gateway.capture((100 * authorization.amount).to_i, authorization.response_code)
-  #
-  #   gateway_error(response) unless response.success?
-  #
-  #   # TODO needs to be cleaned up or recast...
-  #   payment = PaypalPayment.find(authorization.creditcard_payment_id)
-  #
-  #   # create a transaction to reflect the capture
-  #   payment.txns << CreditcardTxn.new( :amount        => authorization.amount,
-  #                                      :response_code => response.authorization,
-  #                                      :txn_type      => CreditcardTxn::TxnType::CAPTURE )
-  #   payment.save
-  # end
+  def paypal_capture(authorization)
+    ppx_response = paypal_gateway.capture((100 * authorization.gross_amount).to_i, authorization.transaction_id)
+
+    if ppx_response.success?
+      payment = authorization.paypal_payment
+
+      transaction = PaypalTxn.new(:paypal_payment => payment,
+                                    :gross_amount   => ppx_response.params["gross_amount"].to_f,
+                                    :message => ppx_response.params["message"],
+                                    :payment_status => ppx_response.params["payment_status"],
+                                    :pending_reason => ppx_response.params["pending_reason"],
+                                    :transaction_id => ppx_response.params["transaction_id"],
+                                    :transaction_type => ppx_response.params["transaction_type"],
+                                    :payment_type => ppx_response.params["payment_type"],
+                                    :ack => ppx_response.params["ack"],
+                                    :token => ppx_response.params["token"],
+                                    :avs_response => ppx_response.avs_result["code"],
+                                    :cvv_response => ppx_response.cvv_result["code"])
+
+      payment.paypal_txns << transaction
+
+      payment.save
+    else
+      gateway_error(ppx_response)
+    end
+  end
+
+  def paypal_refund(authorization, amount=nil)
+    ppx_response = paypal_gateway.credit(amount.nil? ? (100 * authorization.gross_amount).to_i : (100 * amount).to_i, authorization.transaction_id)
+
+    if ppx_response.success?
+      payment = authorization.paypal_payment
+
+      transaction = PaypalTxn.new(:paypal_payment => payment,
+                                    :gross_amount   => ppx_response.params["gross_refund_amount"].to_f,
+                                    :message => ppx_response.params["message"],
+                                    :payment_status => "Refunded",
+                                    :pending_reason => ppx_response.params["pending_reason"],
+                                    :transaction_id => ppx_response.params["refund_transaction_id"],
+                                    :transaction_type => ppx_response.params["transaction_type"],
+                                    :payment_type => ppx_response.params["payment_type"],
+                                    :ack => ppx_response.params["ack"],
+                                    :token => ppx_response.params["token"],
+                                    :avs_response => ppx_response.avs_result["code"],
+                                    :cvv_response => ppx_response.cvv_result["code"])
+
+      payment.paypal_txns << transaction
+
+      payment.save
+    else
+      gateway_error(ppx_response)
+    end
+  end
 
   private
   def fixed_opts
@@ -287,8 +336,6 @@ module Spree::PaypalExpress
   def paypal_gateway
     integration = BillingIntegration.find(params[:integration_id]) if params.key? :integration_id
     integration ||= BillingIntegration.current
-
-
 
     gateway = integration.provider
   end
