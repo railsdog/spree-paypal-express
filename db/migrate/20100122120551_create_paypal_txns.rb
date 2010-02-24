@@ -1,6 +1,6 @@
 class CreatePaypalTxns < ActiveRecord::Migration
   def self.up
-    create_table :paypal_txns do |t|
+      create_table :paypal_txns do |t|
       t.references :paypal_payment
       t.decimal :gross_amount, :precision => 8, :scale => 2
       t.string :payment_status

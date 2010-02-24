@@ -5,7 +5,7 @@ module Spree::PaypalExpress
 
   def paypal_checkout
     load_object
-    opts = all_opts(@order, 'checkout')
+    opts = all_opts(@order, params[:payment_method_id], 'checkout')
     opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
@@ -16,12 +16,12 @@ module Spree::PaypalExpress
       return
     end
 
-    redirect_to (gateway.redirect_url_for response.token)
+    redirect_to (gateway.redirect_url_for response.token, :review => review)
   end
 
   def paypal_payment
     load_object
-    opts = all_opts(@order, 'payment')
+    opts = all_opts(@order,params[:payment_method_id], 'payment')
     opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
@@ -32,23 +32,28 @@ module Spree::PaypalExpress
       return
     end
 
-    redirect_to (gateway.redirect_url_for response.token)
+    redirect_to (gateway.redirect_url_for response.token, :review => review)
   end
 
   def paypal_confirm
     load_object
 
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order)
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id])
     gateway = paypal_gateway
 
     @ppx_details = gateway.details_for params[:token]
 
     if @ppx_details.success?
       # now save the updated order info
-      @order.checkout.email = @ppx_details.email
+
+      PaypalAccount.create(:email => @ppx_details.params["payer"],
+                           :payer_id => @ppx_details.params["payer_id"],
+                           :payer_country => @ppx_details.params["payer_country"],
+                           :payer_status => @ppx_details.params["payer_status"])
+
       @order.checkout.special_instructions = @ppx_details.params["note"]
 
-      @order.update_attribute(:user, current_user)
+      #@order.update_attribute(:user, current_user)
 
       ship_address = @ppx_details.address
       order_ship_address = Address.new :firstname  => @ppx_details.params["first_name"],
@@ -71,7 +76,12 @@ module Spree::PaypalExpress
 
       @order.checkout.ship_address = order_ship_address
       @order.checkout.save
-      render :partial => "shared/paypal_express_confirm", :layout => true
+
+      if review
+        render :partial => "shared/paypal_express_confirm", :layout => true
+      else
+        paypal_finish
+      end
     else
       gateway_error(@ppx_details)
     end
@@ -79,9 +89,8 @@ module Spree::PaypalExpress
 
   def paypal_finish
     load_object
-    #order = Order.find_by_number(params[:id])
 
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order)
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id])
     gateway = paypal_gateway
 
     if Spree::Config[:auto_capture]
@@ -91,23 +100,26 @@ module Spree::PaypalExpress
     end
 
     if ppx_auth_response.success?
+      paypal_account = PaypalAccount.find_by_payer_id(params[:PayerID])
 
-      payment = @order.paypal_payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f)
+      payment = @order.checkout.payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f,
+                                                :source => paypal_account,
+                                                :payment_method_id => params[:payment_method_id])
 
-      transaction = PaypalTxn.new(:paypal_payment => payment,
-                                    :gross_amount   => ppx_auth_response.params["gross_amount"].to_f,
-                                    :message => ppx_auth_response.params["message"],
-                                    :payment_status => ppx_auth_response.params["payment_status"],
-                                    :pending_reason => ppx_auth_response.params["pending_reason"],
-                                    :transaction_id => ppx_auth_response.params["transaction_id"],
-                                    :transaction_type => ppx_auth_response.params["transaction_type"],
-                                    :payment_type => ppx_auth_response.params["payment_type"],
-                                    :ack => ppx_auth_response.params["ack"],
-                                    :token => ppx_auth_response.params["token"],
-                                    :avs_response => ppx_auth_response.avs_result["code"],
-                                    :cvv_response => ppx_auth_response.cvv_result["code"])
+      PaypalTxn.create(:payment => payment,
+                       :txn_type => PaypalTxn::TxnType::AUTHORIZE,
+                       :amount => ppx_auth_response.params["gross_amount"].to_f,
+                       :message => ppx_auth_response.params["message"],
+                       :payment_status => ppx_auth_response.params["payment_status"],
+                       :pending_reason => ppx_auth_response.params["pending_reason"],
+                       :transaction_id => ppx_auth_response.params["transaction_id"],
+                       :transaction_type => ppx_auth_response.params["transaction_type"],
+                       :payment_type => ppx_auth_response.params["payment_type"],
+                       :response_code => ppx_auth_response.params["ack"],
+                       :token => ppx_auth_response.params["token"],
+                       :avs_response => ppx_auth_response.avs_result["code"],
+                       :cvv_response => ppx_auth_response.cvv_result["code"])
 
-      payment.paypal_txns << transaction
 
       @order.save!
       @checkout.reload
@@ -135,15 +147,16 @@ module Spree::PaypalExpress
     if ppx_response.success?
       payment = authorization.paypal_payment
 
-      transaction = PaypalTxn.new(:paypal_payment => payment,
-                                    :gross_amount   => ppx_response.params["gross_amount"].to_f,
+      transaction = PaypalTxn.new(:payment => payment,
+                                    :txn_type => PaypalTxn::TxnType::CAPTURE,
+                                    :amount   => ppx_response.params["gross_amount"].to_f,
                                     :message => ppx_response.params["message"],
                                     :payment_status => ppx_response.params["payment_status"],
                                     :pending_reason => ppx_response.params["pending_reason"],
                                     :transaction_id => ppx_response.params["transaction_id"],
                                     :transaction_type => ppx_response.params["transaction_type"],
                                     :payment_type => ppx_response.params["payment_type"],
-                                    :ack => ppx_response.params["ack"],
+                                    :response_code => ppx_response.params["ack"],
                                     :token => ppx_response.params["token"],
                                     :avs_response => ppx_response.avs_result["code"],
                                     :cvv_response => ppx_response.cvv_result["code"])
@@ -185,6 +198,12 @@ module Spree::PaypalExpress
 
   private
   def fixed_opts
+    if Spree::Config[:paypal_express_local_confirm].nil?
+      user_action = "continue"
+    else
+      user_action = Spree::Config[:paypal_express_local_confirm] == "t" ? "continue" : "commit"
+    end
+
     { :description             => "Goods from #{Spree::Config[:site_name]}", # site details...
 
       #:page_style             => "foobar", # merchant account can set named config
@@ -198,6 +217,7 @@ module Spree::PaypalExpress
       :notify_url              => 'to be done',                 # this is a callback, not tried it yet
 
       :req_confirm_shipping    => false,   # for security, might make an option later
+      :user_action             => user_action
 
       # WARNING -- don't use :ship_discount, :insurance_offered, :insurance since
       # they've not been tested and may trigger some paypal bugs, eg not showing order
@@ -205,7 +225,7 @@ module Spree::PaypalExpress
     }
   end
 
-  def order_opts(order, stage)
+  def order_opts(order, payment_method, stage)
     items = order.line_items.map do |item|
               tax = paypal_variant_tax(item.price, item.variant)
               price = (item.price * 100).to_i # convert for gateway
@@ -223,7 +243,7 @@ module Spree::PaypalExpress
             end
 
 
-    opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/checkout/paypal_confirm",
+    opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/checkout/paypal_confirm?payment_method_id=#{payment_method}",
              :cancel_return_url => "http://"  + request.host_with_port + "/orders/#{order.number}/edit",
              :order_id          => order.number,
              :custom            => order.number,
@@ -285,9 +305,8 @@ module Spree::PaypalExpress
     }
   end
 
-  def all_opts(order, stage=nil)
-    opts = fixed_opts.merge(order_opts(order, stage))#.
-              # merge(paypal_site_options                order) BQ
+  def all_opts(order, payment_method, stage=nil)
+    opts = fixed_opts.merge(order_opts(order, payment_method, stage))
 
     if stage == "payment"
       opts.merge! flat_rate_shipping_and_handling_options(order, stage)
@@ -334,9 +353,16 @@ module Spree::PaypalExpress
 
   # create the gateway from the supplied options
   def paypal_gateway
-    integration = BillingIntegration.find(params[:integration_id]) if params.key? :integration_id
-    integration ||= BillingIntegration.current
-
+    integration = PaymentMethod.find(params[:payment_method_id])
     gateway = integration.provider
+  end
+
+  # if you want to confirm the order on Paypal's site, then this needs to return false
+  def review
+    if Spree::Config[:paypal_express_review].nil?
+      true
+    else
+      Spree::Config[:paypal_express_review] == "t" ? true : false
+    end
   end
 end
