@@ -16,7 +16,7 @@ module Spree::PaypalExpress
       return
     end
 
-    redirect_to (gateway.redirect_url_for response.token, :review => review)
+    redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
   end
 
   def paypal_payment
@@ -32,7 +32,7 @@ module Spree::PaypalExpress
       return
     end
 
-    redirect_to (gateway.redirect_url_for response.token, :review => review)
+    redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
   end
 
   def paypal_confirm
@@ -77,7 +77,7 @@ module Spree::PaypalExpress
       @order.checkout.ship_address = order_ship_address
       @order.checkout.save
 
-      if review
+      if payment_method.preferred_review
         render :partial => "shared/paypal_express_confirm", :layout => true
       else
         paypal_finish
@@ -318,17 +318,11 @@ module Spree::PaypalExpress
   end
 
   # create the gateway from the supplied options
-  def paypal_gateway
-    integration = PaymentMethod.find(params[:payment_method_id])
-    gateway = integration.provider
+  def payment_method
+    PaymentMethod.find(params[:payment_method_id])
   end
 
-  # if you want to confirm the order on Paypal's site, then this needs to return false
-  def review
-    if Spree::Config[:paypal_express_review].nil?
-      true
-    else
-      Spree::Config[:paypal_express_review] == "t" ? true : false
-    end
+  def paypal_gateway
+    payment_method.provider
   end
 end
