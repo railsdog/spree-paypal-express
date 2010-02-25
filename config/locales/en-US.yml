@@ -10,6 +10,15 @@ en-US:
   paypal_payment_id: PayPal Payment ID
   pending_reason: Pending Reason
   result: Result
+  review: Review
+  paypal_account: PayPal Account
+  payer_id: Payer ID
+  payer_country: Country
+  payer_status: Status
+  comment: Comment
+  account_details: Account Details
+  finalize:
+    paypalexpress: Capture Payment
   activerecord:
      attributes:
        paypal_payment:

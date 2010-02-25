@@ -10,6 +10,8 @@ en-GB:
   paypal_payment_id: PayPal Payment ID
   pending_reason: Pending Reason
   result: Result
+  finalize:
+    paypalexpress: Capture Payment
   activerecord:
      attributes:
        paypal_payment:

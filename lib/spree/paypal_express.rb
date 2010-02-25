@@ -95,8 +95,10 @@ module Spree::PaypalExpress
 
     if Spree::Config[:auto_capture]
       ppx_auth_response = gateway.purchase((@order.total*100).to_i, opts)
+      txn_type = PaypalTxn::TxnType::CAPTURE
     else
       ppx_auth_response = gateway.authorize((@order.total*100).to_i, opts)
+      txn_type = PaypalTxn::TxnType::AUTHORIZE
     end
 
     if ppx_auth_response.success?
@@ -107,7 +109,7 @@ module Spree::PaypalExpress
                                                 :payment_method_id => params[:payment_method_id])
 
       PaypalTxn.create(:payment => payment,
-                       :txn_type => PaypalTxn::TxnType::AUTHORIZE,
+                       :txn_type => txn_type,
                        :amount => ppx_auth_response.params["gross_amount"].to_f,
                        :message => ppx_auth_response.params["message"],
                        :payment_status => ppx_auth_response.params["payment_status"],
@@ -132,33 +134,6 @@ module Spree::PaypalExpress
     else
       order_params = {}
       gateway_error(ppx_auth_response)
-    end
-  end
-
-  def paypal_refund(authorization, amount=nil)
-    ppx_response = paypal_gateway.credit(amount.nil? ? (100 * authorization.gross_amount).to_i : (100 * amount).to_i, authorization.transaction_id)
-
-    if ppx_response.success?
-      payment = authorization.paypal_payment
-
-      transaction = PaypalTxn.new(:paypal_payment => payment,
-                                    :gross_amount   => ppx_response.params["gross_refund_amount"].to_f,
-                                    :message => ppx_response.params["message"],
-                                    :payment_status => "Refunded",
-                                    :pending_reason => ppx_response.params["pending_reason"],
-                                    :transaction_id => ppx_response.params["refund_transaction_id"],
-                                    :transaction_type => ppx_response.params["transaction_type"],
-                                    :payment_type => ppx_response.params["payment_type"],
-                                    :ack => ppx_response.params["ack"],
-                                    :token => ppx_response.params["token"],
-                                    :avs_response => ppx_response.avs_result["code"],
-                                    :cvv_response => ppx_response.cvv_result["code"])
-
-      payment.paypal_txns << transaction
-
-      payment.save
-    else
-      gateway_error(ppx_response)
     end
   end
 

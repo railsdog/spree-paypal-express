@@ -1,0 +1,74 @@
+<fieldset>
+  <legend><%= t('paypal_account') %></legend>
+
+  <table class="index">
+    <tr>
+      <th colspan="6"><%= t('account_details') %></th>
+    </tr>
+    <tr>
+      <td><label><%= t("email") %>:</label></td>
+      <td>
+        <%= payment.source.email %>
+      </td>
+      <td><label><%= t("payer_id") %>:</label></td>
+      <td>
+        <%= payment.source.payer_id %>
+      </td>
+      <td><label><%= t("payer_country") %>:</label></td>
+      <td>
+        <%= payment.source.payer_country %>
+      </td>
+    </tr>
+    <tr>
+      <td><label><%= t("payer_status") %>:</label></td>
+      <td colspan="5">
+        <%= payment.source.payer_status %>
+      </td>
+    </tr>
+  </table>
+</fieldset>
+
+<fieldset>
+  <legend><%= t('transactions') %></legend>
+
+  <% payment.txns.reverse.each do |txn| %>
+    <table class="index">
+      <tr>
+        <th colspan="6"><%= t('transaction') %> <%= txn.transaction_id %> -  <%= txn.created_at.to_s(:date_time24) %></th>
+      </tr>
+      <tr>
+        <td width="12%;"><label><%= t('type') %>:</label></td>
+        <td width="20%;">
+          <%= txn.txn_type_name %>
+        </td>
+        <td width="8%;"><label><%= t("result") %>:</label></td>
+        <td width="20%;">
+          <%= txn.response_code %>
+        </td>
+        <td width="15%;"><label><%= t("amount") %>:</label></td>
+        <td width="20%;">
+          <%= number_to_currency txn.amount %>
+        </td>
+      </tr>
+      <tr>
+        <td><label><%= t("comment") %>:</label></td>
+        <td colspan="3">
+          <%= txn.message %>
+        </td>
+        <td><label><%= t("status") %>:</label></td>
+        <td>
+          <%= txn.payment_status %>
+        </td>
+      </tr>
+      <% if txn.payment_status == "Pending" %>
+        <tr>
+          <td><label><%= t("pending_reason") %>:</label></td>
+          <td colspan="5">
+            <%= txn.pending_reason %>
+          </td>
+        </tr>
+      <% end %>
+    </table>
+  <% end %>
+
+</fieldset>
