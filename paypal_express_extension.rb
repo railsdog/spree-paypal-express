@@ -21,10 +21,5 @@ class PaypalExpressExtension < Spree::Extension
     CheckoutsController.class_eval do
       include Spree::PaypalExpress
     end
-
-    # probably not needed once the payments mech is generalised
-    Order.class_eval do
-      has_many :paypal_payments
-    end
   end
 end

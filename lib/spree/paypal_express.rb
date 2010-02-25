@@ -123,49 +123,15 @@ module Spree::PaypalExpress
 
       @order.save!
       @checkout.reload
+      #need to force checkout to complete state
       until @checkout.state == "complete"
         @checkout.next!
       end
-
-      # todo - share code
-      flash[:notice] = t('order_processed_successfully')
-      order_params = {:checkout_complete => true}
-      order_params[:order_token] = @order.token unless @order.user
-      session[:order_id] = nil if @order.checkout.completed_at
+      complete_checkout
 
     else
       order_params = {}
       gateway_error(ppx_auth_response)
-    end
-
-    redirect_to order_url(@order, order_params)
-  end
-
-  def paypal_capture(authorization)
-    ppx_response = paypal_gateway.capture((100 * authorization.gross_amount).to_i, authorization.transaction_id)
-
-    if ppx_response.success?
-      payment = authorization.paypal_payment
-
-      transaction = PaypalTxn.new(:payment => payment,
-                                    :txn_type => PaypalTxn::TxnType::CAPTURE,
-                                    :amount   => ppx_response.params["gross_amount"].to_f,
-                                    :message => ppx_response.params["message"],
-                                    :payment_status => ppx_response.params["payment_status"],
-                                    :pending_reason => ppx_response.params["pending_reason"],
-                                    :transaction_id => ppx_response.params["transaction_id"],
-                                    :transaction_type => ppx_response.params["transaction_type"],
-                                    :payment_type => ppx_response.params["payment_type"],
-                                    :response_code => ppx_response.params["ack"],
-                                    :token => ppx_response.params["token"],
-                                    :avs_response => ppx_response.avs_result["code"],
-                                    :cvv_response => ppx_response.cvv_result["code"])
-
-      payment.paypal_txns << transaction
-
-      payment.save
-    else
-      gateway_error(ppx_response)
     end
   end
 
