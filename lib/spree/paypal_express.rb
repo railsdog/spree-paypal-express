@@ -131,6 +131,10 @@ module Spree::PaypalExpress
       end
       complete_checkout
 
+      if Spree::Config[:auto_capture]
+        payment.finalize!
+      end
+
     else
       order_params = {}
       gateway_error(ppx_auth_response)
