@@ -54,27 +54,28 @@ module Spree::PaypalExpress
       @order.checkout.special_instructions = @ppx_details.params["note"]
 
       #@order.update_attribute(:user, current_user)
+      unless payment_method.preferred_no_shipping
+        ship_address = @ppx_details.address
+        order_ship_address = Address.new :firstname  => @ppx_details.params["first_name"],
+                                         :lastname   => @ppx_details.params["last_name"],
+                                         :address1   => ship_address["address1"],
+                                         :address2   => ship_address["address2"],
+                                         :city       => ship_address["city"],
+                                         :country    => Country.find_by_iso(ship_address["country"]),
+                                         :zipcode    => ship_address["zip"],
+                                         # phone is currently blanked in AM's PPX response lib
+                                         :phone      => @ppx_details.params["phone"] || "(not given)"
 
-      ship_address = @ppx_details.address
-      order_ship_address = Address.new :firstname  => @ppx_details.params["first_name"],
-                                       :lastname   => @ppx_details.params["last_name"],
-                                       :address1   => ship_address["address1"],
-                                       :address2   => ship_address["address2"],
-                                       :city       => ship_address["city"],
-                                       :country    => Country.find_by_iso(ship_address["country"]),
-                                       :zipcode    => ship_address["zip"],
-                                       # phone is currently blanked in AM's PPX response lib
-                                       :phone      => @ppx_details.params["phone"] || "(not given)"
+        if (state = State.find_by_abbr(ship_address["state"]))
+          order_ship_address.state = state
+        else
+          order_ship_address.state_name = ship_address["state"]
+        end
 
-      if (state = State.find_by_abbr(ship_address["state"]))
-        order_ship_address.state = state
-      else
-        order_ship_address.state_name = ship_address["state"]
+        order_ship_address.save!
+
+        @order.checkout.ship_address = order_ship_address
       end
-
-      order_ship_address.save!
-
-      @order.checkout.ship_address = order_ship_address
       @order.checkout.save
 
       if payment_method.preferred_review
@@ -90,7 +91,7 @@ module Spree::PaypalExpress
   def paypal_finish
     load_object
 
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id])
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id], 'checkout' )
     gateway = paypal_gateway
 
     if Spree::Config[:auto_capture]
@@ -169,6 +170,11 @@ module Spree::PaypalExpress
       # see http://www.pdncommunity.com/t5/PayPal-Developer-Blog/Displaying-Order-Details-in-Express-Checkout/bc-p/92902#C851
     }
   end
+  
+  # hook to override paypal site options
+  def paypal_site_opts
+    {}
+  end
 
   def order_opts(order, payment_method, stage)
     items = order.line_items.map do |item|
@@ -201,6 +207,8 @@ module Spree::PaypalExpress
       # get the main totals from the items (already *100)
       opts[:subtotal] = opts[:items].map {|i| i[:amount] * i[:qty] }.sum
       opts[:tax]      = opts[:items].map {|i| i[:tax]    * i[:qty] }.sum
+      opts[:handling] = 0  # MJM Added to force elements to be generated
+      opts[:shipping] = (order.ship_total*100).to_i
 
       # overall total
       opts[:money]    = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
@@ -234,24 +242,28 @@ module Spree::PaypalExpress
   end
 
   def address_options(order)
-    {
-      :no_shipping => false,
-      :address_override => true,
-      :address => {
-        :name       => "#{order.ship_address.firstname} #{order.ship_address.lastname}",
-        :address1   => order.ship_address.address1,
-        :address2   => order.ship_address.address2,
-        :city       => order.ship_address.city,
-        :state      => order.ship_address.state.nil? ? order.ship_address.state_name.to_s : order.ship_address.state.abbr,
-        :country    => order.ship_address.country.iso,
-        :zip        => order.ship_address.zipcode,
-        :phone      => order.ship_address.phone
+    if payment_method.preferred_no_shipping 
+      { :no_shipping => true }
+    else
+      {
+        :no_shipping => false,
+        :address_override => true,
+        :address => {
+          :name       => "#{order.ship_address.firstname} #{order.ship_address.lastname}",
+          :address1   => order.ship_address.address1,
+          :address2   => order.ship_address.address2,
+          :city       => order.ship_address.city,
+          :state      => order.ship_address.state.nil? ? order.ship_address.state_name.to_s : order.ship_address.state.abbr,
+          :country    => order.ship_address.country.iso,
+          :zip        => order.ship_address.zipcode,
+          :phone      => order.ship_address.phone
+        }
       }
-    }
+    end
   end
 
   def all_opts(order, payment_method, stage=nil)
-    opts = fixed_opts.merge(order_opts(order, payment_method, stage))
+    opts = fixed_opts.merge(order_opts(order, payment_method, stage)).merge(paypal_site_opts)
 
     if stage == "payment"
       opts.merge! flat_rate_shipping_and_handling_options(order, stage)

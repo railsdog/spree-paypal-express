@@ -11,6 +11,7 @@ en-US:
   pending_reason: Pending Reason
   result: Result
   review: Review
+  no_shipping: No Shipping
   paypal_account: PayPal Account
   payer_id: Payer ID
   payer_country: Country

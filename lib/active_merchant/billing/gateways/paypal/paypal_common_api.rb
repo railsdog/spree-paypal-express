@@ -10,40 +10,6 @@ module ActiveMerchant #:nodoc:
 
       silence_warnings do
         API_VERSION = '60.0'
-
-        URLS = {
-          :test => { :certificate => 'https://api.sandbox.paypal.com/2.0/',
-                     :signature   => 'https://api-3t.sandbox.paypal.com/2.0/' },
-          :live => { :certificate => 'https://api-aa.paypal.com/2.0/',
-                     :signature   => 'https://api-3t.paypal.com/2.0/' }
-        }
-
-        PAYPAL_NAMESPACE = 'urn:ebay:api:PayPalAPI'
-        EBAY_NAMESPACE = 'urn:ebay:apis:eBLBaseComponents'
-
-        ENVELOPE_NAMESPACES = { 'xmlns:xsd' => 'http://www.w3.org/2001/XMLSchema',
-                                'xmlns:env' => 'http://schemas.xmlsoap.org/soap/envelope/',
-                                'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance'
-                              }
-        CREDENTIALS_NAMESPACES = { 'xmlns' => PAYPAL_NAMESPACE,
-                                   'xmlns:n1' => EBAY_NAMESPACE,
-                                   'env:mustUnderstand' => '0'
-                                 }
-
-        AUSTRALIAN_STATES = {
-          'ACT' => 'Australian Capital Territory',
-          'NSW' => 'New South Wales',
-          'NT'  => 'Northern Territory',
-          'QLD' => 'Queensland',
-          'SA'  => 'South Australia',
-          'TAS' => 'Tasmania',
-          'VIC' => 'Victoria',
-          'WA'  => 'Western Australia'
-        }
-
-        SUCCESS_CODES = [ 'Success', 'SuccessWithWarning' ]
-
-        FRAUD_REVIEW_CODE = "11610"
       end
 
       # The gateway must be configured with either your PayPal PEM file
@@ -291,7 +257,7 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_payment_detail_item(xml, item)
+      def add_payment_detail_item(xml, item, options)
         currency_code = options[:currency] || currency(item[:amount])
         xml.tag! 'n2:PaymentDetailsItem' do
           xml.tag! 'n2:Name',        item[:name]        unless item[:name].blank?
@@ -335,7 +301,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'n2:ButtonSource', application_id.to_s.slice(0,32) unless application_id.blank?
           xml.tag! 'n2:NotifyURL', options[:notify_url] unless options[:notify_url].blank?
           add_address(xml, 'n2:ShipToAddress', options[:shipping_address] || options[:address])
-          options[:items].each {|i| add_payment_detail_item xml, i } if options[:items]
+          options[:items].each {|i| add_payment_detail_item xml, i, options } if options[:items]
         end
       end
 

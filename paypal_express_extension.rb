@@ -14,12 +14,11 @@ class PaypalExpressExtension < Spree::Extension
     # these will be submitted to ActiveMerchant some time...
     require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal", "paypal_common_api.rb")
     require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal_express_uk.rb")
-    require File.join(PaypalExpressExtension.root, "lib", "active_merchant", "billing", "gateways", "paypal_express_uk.rb")
-
 
     # inject paypal code into orders controller
     CheckoutsController.class_eval do
       include Spree::PaypalExpress
     end
+    
   end
 end
