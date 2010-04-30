@@ -264,7 +264,11 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'n2:Description', item[:description] unless item[:description].blank?
           xml.tag! 'n2:Number',      item[:sku]         unless item[:sku].blank?
           xml.tag! 'n2:Quantity',    item[:qty]         unless item[:qty].blank?
-          xml.tag! 'n2:Amount',      amount(item[:amount]), 'currencyID' => currency_code unless item[:amount].blank?
+          if item[:amount].to_i > 0
+            xml.tag! 'n2:Amount',      amount(item[:amount]), 'currencyID' => currency_code unless item[:amount].blank?
+          else
+            xml.tag! 'n2:Amount',     "-#{amount(item[:amount].to_i*-1)}", 'currencyID' => currency_code unless item[:amount].blank?
+          end
           xml.tag! 'n2:Tax',         amount(item[:tax]), 'currencyID' => currency_code unless item[:tax].blank?
           xml.tag! 'n2:ItemWeight',  item[:weight]      unless item[:weight].blank?
           xml.tag! 'n2:ItemHeight',  item[:height]      unless item[:height].blank?

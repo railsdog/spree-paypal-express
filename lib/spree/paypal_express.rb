@@ -170,7 +170,7 @@ module Spree::PaypalExpress
       # see http://www.pdncommunity.com/t5/PayPal-Developer-Blog/Displaying-Order-Details-in-Express-Checkout/bc-p/92902#C851
     }
   end
-  
+
   # hook to override paypal site options
   def paypal_site_opts
     {}
@@ -178,21 +178,30 @@ module Spree::PaypalExpress
 
   def order_opts(order, payment_method, stage)
     items = order.line_items.map do |item|
-              tax = paypal_variant_tax(item.price, item.variant)
-              price = (item.price * 100).to_i # convert for gateway
-              tax   = (tax        * 100).to_i # truncate the tax slice
-              { :name        => item.variant.product.name,
-                :description => item.variant.product.description[0..120],
-                :sku         => item.variant.sku,
-                :qty         => item.quantity,
-                :amount      => price - tax,
-                :tax         => tax,
-                :weight      => item.variant.weight,
-                :height      => item.variant.height,
-                :width       => item.variant.width,
-                :depth       => item.variant.weight }
-            end
+      tax = paypal_variant_tax(item.price, item.variant)
+      price = (item.price * 100).to_i # convert for gateway
+      tax   = (tax        * 100).to_i # truncate the tax slice
+      { :name        => item.variant.product.name,
+        :description => item.variant.product.description[0..120],
+        :sku         => item.variant.sku,
+        :qty         => item.quantity,
+        :amount      => price - tax,
+        :tax         => tax,
+        :weight      => item.variant.weight,
+        :height      => item.variant.height,
+        :width       => item.variant.width,
+        :depth       => item.variant.weight }
+    end
 
+    credits = order.credits.map do |credit|
+      { :name        => credit.description,
+        :description => credit.description,
+        :sku         => credit.id,
+        :qty         => 1,
+        :amount      => (credit.amount*100).to_i }
+    end
+
+    items.concat credits
 
     opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/checkout/paypal_confirm?payment_method_id=#{payment_method}",
              :cancel_return_url => "http://"  + request.host_with_port + "/orders/#{order.number}/edit",
@@ -207,27 +216,20 @@ module Spree::PaypalExpress
       # get the main totals from the items (already *100)
       opts[:subtotal] = opts[:items].map {|i| i[:amount] * i[:qty] }.sum
       opts[:tax]      = opts[:items].map {|i| i[:tax]    * i[:qty] }.sum
-      opts[:handling] = 0  # MJM Added to force elements to be generated
+      opts[:handling] = 0
       opts[:shipping] = (order.ship_total*100).to_i
 
       # overall total
       opts[:money]    = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
-
-      opts[:money] = (order.total*100).to_i
 
       opts[:callback_url] = "http://"  + request.host_with_port + "/paypal_express_callbacks/#{order.number}"
       opts[:callback_timeout] = 3
-
     elsif  stage == "payment"
       #use real totals are we are paying via paypal (spree checkout almost complete)
-      opts[:subtotal] = (order.item_total*100).to_i
-      opts[:tax]      = 0 # BQ : not sure what to do here
+      opts[:subtotal] = ((order.item_total + order.credits.total)*100).to_i
+      opts[:tax]      = (order.tax_total*100).to_i
       opts[:shipping] = (order.ship_total*100).to_i
-      opts[:handling] = 0 # BQ : not sure what to do here
-
-      # overall total
-      opts[:money]    = opts.slice(:subtotal, :tax, :shipping, :handling).values.sum
-
+      opts[:handling] = 0
       opts[:money] = (order.total*100).to_i
     end
 
@@ -242,7 +244,7 @@ module Spree::PaypalExpress
   end
 
   def address_options(order)
-    if payment_method.preferred_no_shipping 
+    if payment_method.preferred_no_shipping
       { :no_shipping => true }
     else
       {

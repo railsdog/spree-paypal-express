@@ -15,7 +15,6 @@ module ActiveMerchant #:nodoc:
 
       def setup_authorization(money, options = {})
         requires!(options, :return_url, :cancel_return_url)
-
         commit 'SetExpressCheckout', build_setup_request('Authorization', money, options)
       end
 
