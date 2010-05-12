@@ -37,15 +37,13 @@ class PaypalAccount < ActiveRecord::Base
 
   def credit(payment, amount=nil)
     authorization = find_capture(payment)
-
+    amount ||= payment.order.outstanding_credit
     ppx_response = payment.payment_method.provider.credit(amount.nil? ? (100 * amount).to_i : (100 * amount).to_i, authorization.transaction_id)
 
     if ppx_response.success?
-      payment = authorization.paypal_payment
-
-      PaypalTxn.new(:paypal_payment => payment,
+      PaypalTxn.new(:payment => payment,
                     :txn_type => PaypalTxn::TxnType::CREDIT,
-                    :gross_amount   => ppx_response.params["gross_refund_amount"].to_f,
+                    :amount   => ppx_response.params["gross_refund_amount"].to_f,
                     :message => ppx_response.params["message"],
                     :payment_status => "Refunded",
                     :pending_reason => ppx_response.params["pending_reason"],
@@ -57,7 +55,8 @@ class PaypalAccount < ActiveRecord::Base
                     :avs_response => ppx_response.avs_result["code"],
                     :cvv_response => ppx_response.cvv_result["code"])
 
-
+      payment.update_attribute(:amount, payment.amount - amount)
+      payment.order.update_totals!
     else
       gateway_error(ppx_response.message)
     end
@@ -66,7 +65,7 @@ class PaypalAccount < ActiveRecord::Base
   def can_credit?(payment)
     !find_capture(payment).nil?
   end
-  
+
   # fix for Payment#payment_profiles_supported?
   def payment_gateway
     false
