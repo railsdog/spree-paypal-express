@@ -38,7 +38,7 @@ module Spree::PaypalExpress
   def paypal_confirm
     load_object
 
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id])
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id],  'payment')
     gateway = paypal_gateway
 
     @ppx_details = gateway.details_for params[:token]
@@ -91,7 +91,7 @@ module Spree::PaypalExpress
   def paypal_finish
     load_object
 
-    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id], 'checkout' )
+    opts = { :token => params[:token], :payer_id => params[:PayerID] }.merge all_opts(@order, params[:payment_method_id], 'payment' )
     gateway = paypal_gateway
 
     if Spree::Config[:auto_capture]
