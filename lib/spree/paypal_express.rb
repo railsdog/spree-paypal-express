@@ -2,7 +2,11 @@
 module Spree::PaypalExpress
   include ERB::Util
   include ActiveMerchant::RequiresParameters
-
+  
+  def self.included(target)
+    target.before_filter :redirect_to_paypal_express_form_if_needed, :only => [:update]
+  end
+  
   def paypal_checkout
     load_object
     opts = all_opts(@order, params[:payment_method_id], 'checkout')
@@ -143,6 +147,18 @@ module Spree::PaypalExpress
   end
 
   private
+  def redirect_to_paypal_express_form_if_needed
+    return unless params[:step] == "payment"
+    
+    load_object
+    
+    payment_method = PaymentMethod.find(params[:checkout][:payments_attributes].first[:payment_method_id])
+    
+    if payment_method.kind_of?(BillingIntegration::PaypalExpress) || payment_method.kind_of?(BillingIntegration::PaypalExpressUk)
+      redirect_to paypal_payment_order_checkout_url(@checkout.order, :payment_method_id => payment_method)
+    end
+  end
+  
   def fixed_opts
     if Spree::Config[:paypal_express_local_confirm].nil?
       user_action = "continue"
