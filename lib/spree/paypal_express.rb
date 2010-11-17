@@ -2,11 +2,11 @@
 module Spree::PaypalExpress
   include ERB::Util
   include ActiveMerchant::RequiresParameters
-  
+
   def self.included(target)
     target.before_filter :redirect_to_paypal_express_form_if_needed, :only => [:update]
   end
-  
+
   def paypal_checkout
     load_object
     opts = all_opts(@order, params[:payment_method_id], 'checkout')
@@ -149,16 +149,16 @@ module Spree::PaypalExpress
   private
   def redirect_to_paypal_express_form_if_needed
     return unless params[:step] == "payment"
-    
+
     load_object
-    
+
     payment_method = PaymentMethod.find(params[:checkout][:payments_attributes].first[:payment_method_id])
-    
+
     if payment_method.kind_of?(BillingIntegration::PaypalExpress) || payment_method.kind_of?(BillingIntegration::PaypalExpressUk)
       redirect_to paypal_payment_order_checkout_url(@checkout.order, :payment_method_id => payment_method)
     end
   end
-  
+
   def fixed_opts
     if Spree::Config[:paypal_express_local_confirm].nil?
       user_action = "continue"
@@ -194,21 +194,19 @@ module Spree::PaypalExpress
 
   def order_opts(order, payment_method, stage)
     items = order.line_items.map do |item|
-      tax = paypal_variant_tax(item.price, item.variant)
       price = (item.price * 100).to_i # convert for gateway
-      tax   = (tax        * 100).to_i # truncate the tax slice
       { :name        => item.variant.product.name,
         :description => item.variant.product.description[0..120],
         :sku         => item.variant.sku,
         :qty         => item.quantity,
-        :amount      => price - tax,
-        :tax         => tax,
+        :amount      => price,
         :weight      => item.variant.weight,
         :height      => item.variant.height,
         :width       => item.variant.width,
         :depth       => item.variant.weight }
     end
 
+    #add each credit a line item to ensure totals sum up correctly
     credits = order.credits.map do |credit|
       { :name        => credit.description,
         :description => credit.description,
@@ -245,18 +243,16 @@ module Spree::PaypalExpress
       opts[:subtotal] = ((order.item_total + order.credits.total)*100).to_i
       opts[:tax]      = (order.tax_total*100).to_i
       opts[:shipping] = (order.ship_total*100).to_i
-      opts[:handling] = 0
+
+      #hack to add float rounding difference in as handling fee - prevents PayPal from rejecting orders
+      #becuase the integer totals are different from the float based total. This is temporary and will be
+      #removed once Spree's currency values are persisted as integers (normally only 1c)
+      opts[:handling] =  (order.total*100).to_i - opts.slice(:subtotal, :tax, :shipping).values.sum
+
       opts[:money] = (order.total*100).to_i
     end
 
     opts
-  end
-
-  # hook for supplying tax amount for a single unit of a variant
-  # expects the sale price from the line_item and the variant itself, since
-  #   line_item price and variant price can diverge in time
-  def paypal_variant_tax(sale_price, variant)
-    0.0
   end
 
   def address_options(order)
