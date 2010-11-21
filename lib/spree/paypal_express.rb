@@ -1,4 +1,3 @@
-# aim to unpick this later
 module Spree::PaypalExpress
   include ERB::Util
   include ActiveMerchant::RequiresParameters
@@ -7,13 +6,21 @@ module Spree::PaypalExpress
     target.before_filter :redirect_to_paypal_express_form_if_needed, :only => [:update]
   end
 
+  # Outbound redirect to PayPal from Cart Page
+  # Not fully implmented or tested.
+  #
   def paypal_checkout
     load_object
     opts = all_opts(@order, params[:payment_method_id], 'checkout')
     opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
-    response = gateway.setup_authorization(opts[:money], opts)
+    if Spree::Config[:auto_capture]
+      response = gateway.setup_purchase(opts[:money], opts)
+    else
+      response = gateway.setup_authorization(opts[:money], opts)
+    end
+
     unless response.success?
       gateway_error(response)
       redirect_to edit_order_url(@order)
@@ -23,13 +30,20 @@ module Spree::PaypalExpress
     redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
   end
 
+  # Outbound redirect to PayPal from checkout payments step
+  #
   def paypal_payment
     load_object
     opts = all_opts(@order,params[:payment_method_id], 'payment')
     opts.merge!(address_options(@order))
     gateway = paypal_gateway
 
-    response = gateway.setup_authorization(opts[:money], opts)
+    if Spree::Config[:auto_capture]
+      response = gateway.setup_purchase(opts[:money], opts)
+    else
+      response = gateway.setup_authorization(opts[:money], opts)
+    end
+
     unless response.success?
       gateway_error(response)
       redirect_to edit_order_checkout_url(@order, :step => "payment")
@@ -39,6 +53,8 @@ module Spree::PaypalExpress
     redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
   end
 
+  # Inbound post from PayPal after (possible) successful completion
+  #
   def paypal_confirm
     load_object
 
@@ -92,6 +108,9 @@ module Spree::PaypalExpress
     end
   end
 
+  # Local call from A) Order Review Screen, or B) Automatically after paypal_confirm (no review).
+  # Completes checkout & order
+  #
   def paypal_finish
     load_object
 
@@ -100,13 +119,23 @@ module Spree::PaypalExpress
 
     if Spree::Config[:auto_capture]
       ppx_auth_response = gateway.purchase((@order.total*100).to_i, opts)
-      txn_type = PaypalTxn::TxnType::CAPTURE
     else
       ppx_auth_response = gateway.authorize((@order.total*100).to_i, opts)
-      txn_type = PaypalTxn::TxnType::AUTHORIZE
     end
 
     if ppx_auth_response.success?
+      #confirm status
+      case ppx_auth_response.params["payment_status"]
+        when "Completed"
+          txn_type = PaypalTxn::TxnType::CAPTURE
+        when "Pending"
+          txn_type = PaypalTxn::TxnType::AUTHORIZE
+        else
+          txn_type = PaypalTxn::TxnType::UNKNOWN
+          Rails.logger.error "Unexpected response from PayPal Express"
+          Rails.logger.error ppx_auth_response.to_yaml
+      end
+
       paypal_account = PaypalAccount.find_by_payer_id(params[:PayerID])
 
       payment = @order.checkout.payments.create(:amount => ppx_auth_response.params["gross_amount"].to_f,
@@ -136,13 +165,17 @@ module Spree::PaypalExpress
       end
       complete_checkout
 
-      if Spree::Config[:auto_capture]
+      # even with auto_capture , an Auth might be returned / forced by PPX
+      if Spree::Config[:auto_capture] && txn_type == PaypalTxn::TxnType::CAPTURE
         payment.finalize!
       end
 
     else
       order_params = {}
       gateway_error(ppx_auth_response)
+
+      #Failed trying to complete pending payment!
+      redirect_to edit_order_checkout_url(@order, :step => "payment")
     end
   end
 
@@ -173,11 +206,8 @@ module Spree::PaypalExpress
       :background_color        => "ffffff",  # must be hex only, six chars
       :header_background_color => "ffffff",
       :header_border_color     => "ffffff",
-
       :allow_note              => true,
       :locale                  => Spree::Config[:default_locale],
-      :notify_url              => 'to be done',                 # this is a callback, not tried it yet
-
       :req_confirm_shipping    => false,   # for security, might make an option later
       :user_action             => user_action
 

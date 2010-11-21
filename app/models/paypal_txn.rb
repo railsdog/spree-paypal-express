@@ -1,5 +1,5 @@
 class PaypalTxn < Transaction
-  enumerable_constant :txn_type, :constants => [:authorize, :capture, :purchase, :void, :credit]
+  enumerable_constant :txn_type, :constants => [:authorize, :capture, :purchase, :void, :credit, :denied, :unknown]
 
   def txn_type_name
     TxnType.from_value(txn_type)
