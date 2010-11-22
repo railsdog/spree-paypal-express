@@ -4,7 +4,6 @@ class PaypalExpressCallbacksController < Spree::BaseController
 
   def notify
     @notification = Paypal::Notification.new(request.raw_post)
-    debugger
 
     # we only care about eChecks (for now?)
     if @notification.params["payment_type"] == "echeck" && @notification.acknowledge
