@@ -32,7 +32,7 @@ class PaypalAccount < ActiveRecord::Base
   end
 
   def can_capture?(payment)
-    find_capture(payment).nil?
+    !echeck?(payment) && find_capture(payment).nil?
   end
 
   def credit(payment, amount=nil)
@@ -86,7 +86,9 @@ class PaypalAccount < ActiveRecord::Base
               :order => 'created_at DESC')
   end
 
-
+  def echeck?(payment)
+    payment.txns.exists?(:payment_type => "echeck")
+  end
 
   def gateway_error(text)
     msg = "#{I18n.t('gateway_error')} ... #{text}"
