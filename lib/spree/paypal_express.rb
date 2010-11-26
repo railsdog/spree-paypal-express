@@ -105,6 +105,9 @@ module Spree::PaypalExpress
       end
     else
       gateway_error(@ppx_details)
+
+      #Failed trying to get payment details from PPX
+      redirect_to edit_order_checkout_url(@order, :step => "payment")
     end
   end
 
