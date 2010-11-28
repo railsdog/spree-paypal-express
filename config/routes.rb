@@ -1,14 +1,26 @@
-# Put your extension routes here.
+Rails.application.routes.draw do
+  resources :orders do
+    resource :checkout, :controller => 'checkout' do
+      member do
+        get :paypal_checkout
+        get :paypal_payment
+        get :paypal_confirm
+        post :paypal_finish
+      end
+    end
+  end
 
-map.resources :orders do |order|
-  order.resource :checkout, :member => {:paypal_checkout => :any, :paypal_payment => :any, :paypal_confirm => :any, :paypal_finish => :any}
-end
-
-map.paypal_notify "/paypal_notify", :controller => :paypal_express_callbacks, :action => :notify, :method => [:post, :get]
-
-map.namespace :admin do |admin|
-  admin.resources :orders do |order|
-    order.resources :paypal_payments, :member => {:capture => :get, :refund => :any}, :has_many => [:txns]
+  match '/paypal_notify' => 'paypal_express_callbacks#notify', :via => [:get, :post]
+  
+  resources :paypal_express_callbacks
+  namespace :admin do
+    resources :orders do
+      resources :paypal_payments do
+        member do
+          get :refund
+          get :capture
+        end       
+      end
+    end
   end
 end
-

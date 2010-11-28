@@ -31,40 +31,41 @@
 <fieldset>
   <legend><%= t('transactions') %></legend>
 
-  <% payment.txns.reverse.each do |txn| %>
+  <% payment.log_entries.reverse.each do |log| %>
+  <% details = YAML.load(log.details) %>
     <table class="index">
       <tr>
-        <th colspan="6"><%= t('transaction') %> <%= txn.transaction_id %> -  <%= txn.created_at.to_s(:date_time24) %></th>
+        <th colspan="6"><%= t('transaction') %> <%= details.params["transaction_id"] %> -  <%= log.created_at.to_s(:date_time24) %></th>
       </tr>
       <tr>
         <td width="12%;"><label><%= t('type') %>:</label></td>
         <td width="20%;">
-          <%= txn.txn_type_name %>
+          <%= details.params["transaction_type"] %>
         </td>
         <td width="8%;"><label><%= t("result") %>:</label></td>
         <td width="20%;">
-          <%= txn.response_code %>
+          <%= details.message %>
         </td>
         <td width="15%;"><label><%= t("amount") %>:</label></td>
         <td width="20%;">
-          <%= number_to_currency txn.amount %>
+          <%= number_to_currency details.params["gross_amount"] %>
         </td>
       </tr>
       <tr>
         <td><label><%= t("comment") %>:</label></td>
         <td colspan="3">
-          <%= txn.message %>
+          <%= details.params["message"] %>
         </td>
         <td><label><%= t("status") %>:</label></td>
         <td>
-          <%= txn.payment_status %>
+          <%= details.params["payment_status"] %>
         </td>
       </tr>
-      <% if txn.payment_status == "Pending" %>
+      <% if details.params["payment_status"] == "Pending" %>
         <tr>
           <td><label><%= t("pending_reason") %>:</label></td>
           <td colspan="5">
-            <%= txn.pending_reason %>
+            <%= details.params["pending_reason"] %>
           </td>
         </tr>
       <% end %>

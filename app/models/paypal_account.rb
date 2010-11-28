@@ -8,23 +8,10 @@ class PaypalAccount < ActiveRecord::Base
   def capture(payment)
     authorization = find_authorization(payment)
 
-    ppx_response = payment.payment_method.provider.capture((100 * payment.amount).to_i, authorization.transaction_id)
-    if ppx_response.success?
-      PaypalTxn.create(:payment => payment,
-                      :txn_type => PaypalTxn::TxnType::CAPTURE,
-                      :amount   => ppx_response.params["gross_amount"].to_f,
-                      :message => ppx_response.params["message"],
-                      :payment_status => ppx_response.params["payment_status"],
-                      :pending_reason => ppx_response.params["pending_reason"],
-                      :transaction_id => ppx_response.params["transaction_id"],
-                      :transaction_type => ppx_response.params["transaction_type"],
-                      :payment_type => ppx_response.params["payment_type"],
-                      :response_code => ppx_response.params["ack"],
-                      :token => ppx_response.params["token"],
-                      :avs_response => ppx_response.avs_result["code"],
-                      :cvv_response => ppx_response.cvv_result["code"])
-
-      payment.finalize!
+    ppx_response = payment.payment_method.provider.capture((100 * payment.amount).to_i, authorization.params["transaction_id"])
+    if ppx_response.success?    
+      record_log payment, ppx_response
+      payment.complete
     else
       gateway_error(ppx_response.message)
     end
@@ -32,37 +19,30 @@ class PaypalAccount < ActiveRecord::Base
   end
 
   def can_capture?(payment)
-    !echeck?(payment) && find_capture(payment).nil?
+    !echeck?(payment) && payment.state == "pending"
   end
 
   def credit(payment, amount=nil)
     authorization = find_capture(payment)
-    amount ||= payment.order.outstanding_credit
-    ppx_response = payment.payment_method.provider.credit(amount.nil? ? (100 * amount).to_i : (100 * amount).to_i, authorization.transaction_id)
+
+    amount = payment.credit_allowed >= payment.order.outstanding_balance.abs ? payment.order.outstanding_balance : payment.credit_allowed
+    
+    ppx_response = payment.payment_method.provider.credit(amount.nil? ? (100 * amount).to_i : (100 * amount).to_i, authorization.params['transaction_id'])
 
     if ppx_response.success?
-      PaypalTxn.new(:payment => payment,
-                    :txn_type => PaypalTxn::TxnType::CREDIT,
-                    :amount   => ppx_response.params["gross_refund_amount"].to_f,
-                    :message => ppx_response.params["message"],
-                    :payment_status => "Refunded",
-                    :pending_reason => ppx_response.params["pending_reason"],
-                    :transaction_id => ppx_response.params["refund_transaction_id"],
-                    :transaction_type => ppx_response.params["transaction_type"],
-                    :payment_type => ppx_response.params["payment_type"],
-                    :response_code => ppx_response.params["ack"],
-                    :token => ppx_response.params["token"],
-                    :avs_response => ppx_response.avs_result["code"],
-                    :cvv_response => ppx_response.cvv_result["code"])
-
+      record_log payment, ppx_response
       payment.update_attribute(:amount, payment.amount - amount)
-      payment.order.update_totals!
+      payment.complete
+      payment.order.update!
     else
       gateway_error(ppx_response.message)
     end
   end
 
   def can_credit?(payment)
+    return false unless payment.state == "completed"
+    return false unless payment.order.payment_state == "credit_owed"
+    payment.credit_allowed > 0
     !find_capture(payment).nil?
   end
 
@@ -70,24 +50,44 @@ class PaypalAccount < ActiveRecord::Base
   def payment_gateway
     false
   end
-
+  
+  def record_log(payment, response)
+    payment.log_entries.create(:details => response.to_yaml)
+  end
+  
   private
   def find_authorization(payment)
-    #find the transaction associated with the original authorization/capture
-    payment.txns.find(:first,
-              :conditions => {:pending_reason =>  "authorization", :payment_status => "Pending", :txn_type => PaypalTxn::TxnType::AUTHORIZE.to_s},
-              :order => 'created_at DESC')
+    logs = payment.log_entries.all(:order => 'created_at DESC')
+    logs.each do |log|
+      details = YAML.load(log.details) # return the transaction details
+      if (details.params['payment_status'] == 'Pending' && details.params['pending_reason'] == 'authorization')
+        return details
+      end
+    end
+    return nil
   end
 
   def find_capture(payment)
     #find the transaction associated with the original authorization/capture
-    payment.txns.find(:first,
-              :conditions => {:payment_status => "Completed", :txn_type => PaypalTxn::TxnType::CAPTURE.to_s},
-              :order => 'created_at DESC')
+    logs = payment.log_entries.all(:order => 'created_at DESC')
+    logs.each do |log|
+      details = YAML.load(log.details) # return the transaction details
+      if details.params['payment_status'] == 'Completed'
+        return details
+      end
+    end
+    return nil
   end
-
+ 
   def echeck?(payment)
-    payment.txns.exists?(:payment_type => "echeck")
+    logs = payment.log_entries.all(:order => 'created_at DESC')
+    logs.each do |log|
+      details = YAML.load(log.details) # return the transaction details
+      if details.params['payment_type'] == 'echeck'
+        return true
+      end
+    end
+    return false
   end
 
   def gateway_error(text)

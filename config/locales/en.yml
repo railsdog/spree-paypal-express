@@ -6,7 +6,7 @@ en:
   paypal_capture_complete: Paypal Transaction has been captured.
   unable_to_capture_paypal: Unable to capture Paypal Transaction.
   signature: Signature
-  order_not_yet_placed: "Your order has <strong>not</strong> been be placed, please review the details and click Confirm below to finalise your order."
+  order_not_yet_placed: "Your order has <strong>NOT</strong> been be placed, please review the details and click <strong>Place Order</strong> below to finalize your order."
   paypal_payment_id: PayPal Payment ID
   pending_reason: Pending Reason
   result: Result
