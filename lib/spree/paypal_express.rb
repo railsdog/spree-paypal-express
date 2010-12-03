@@ -273,7 +273,7 @@ module Spree::PaypalExpress
       opts[:callback_timeout] = 3
     elsif  stage == "payment"
       #use real totals are we are paying via paypal (spree checkout almost complete)
-      opts[:subtotal] = ((order.item_total + order.credits.total)*100).to_i
+      opts[:subtotal] = ((order.item_total * 100) + (order.credits.total * 100)).to_i
       opts[:tax]      = (order.tax_total*100).to_i
       opts[:shipping] = (order.ship_total*100).to_i
 
