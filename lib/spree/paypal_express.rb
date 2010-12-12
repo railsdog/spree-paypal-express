@@ -251,8 +251,8 @@ module Spree::PaypalExpress
       # recalculate all totals here as we need to ignore shipping & tax because we are checking-out via paypal (spree checkout not started)
       opts[:subtotal] = ((order.item_total * 100) + credits_total ).to_i
       opts[:handling] = 0
-      opts[:tax] = ((order.adjustments.map { |a| a.amount if ( a.source_type == 'Order' && a.label == 'Tax') }.compact!.sum) * 100 ).to_i
-      opts[:shipping] = ((order.adjustments.map { |a| a.amount if a.source_type == 'Shipment' }.compact!.sum) * 100 ).to_i
+      opts[:tax] = ((order.adjustments.map { |a| a.amount if ( a.source_type == 'Order' && a.label == 'Tax') }.compact.sum) * 100 ).to_i
+      opts[:shipping] = ((order.adjustments.map { |a| a.amount if a.source_type == 'Shipment' }.compact.sum) * 100 ).to_i
  
       # overall total
       opts[:money] = (order.total * 100 ).to_i
@@ -262,8 +262,8 @@ module Spree::PaypalExpress
     elsif  stage == "payment"
       #use real totals are we are paying via paypal (spree checkout almost complete)
       opts[:subtotal] = ((order.item_total * 100) + credits_total ).to_i
-      opts[:tax] = ((order.adjustments.map { |a| a.amount if ( a.source_type == 'Order' && a.label == 'Tax') }.compact!.sum) * 100 ).to_i
-      opts[:shipping] = ((order.adjustments.map { |a| a.amount if a.source_type == 'Shipment' }.compact!.sum) * 100 ).to_i
+      opts[:tax] = ((order.adjustments.map { |a| a.amount if ( a.source_type == 'Order' && a.label == 'Tax') }.compact.sum) * 100 ).to_i
+      opts[:shipping] = ((order.adjustments.map { |a| a.amount if a.source_type == 'Shipment' }.compact.sum) * 100 ).to_i
       
       #hack to add float rounding difference in as handling fee - prevents PayPal from rejecting orders
       #because the integer totals are different from the float based total. This is temporary and will be
