@@ -28,6 +28,9 @@ module Spree::PaypalExpress
     end
 
     redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
+  rescue ActiveMerchant::ConnectionError => e
+    gateway_error I18n.t(:unable_to_connect_to_gateway)
+    redirect_to :back
   end
 
   # Outbound redirect to PayPal from checkout payments step
@@ -51,6 +54,9 @@ module Spree::PaypalExpress
     end
 
     redirect_to (gateway.redirect_url_for response.token, :review => payment_method.preferred_review)
+  rescue ActiveMerchant::ConnectionError => e
+    gateway_error I18n.t(:unable_to_connect_to_gateway)
+    redirect_to :back
   end
 
   # Inbound post from PayPal after (possible) successful completion
@@ -103,12 +109,16 @@ module Spree::PaypalExpress
       else
         paypal_finish
       end
+
     else
       gateway_error(@ppx_details)
 
       #Failed trying to get payment details from PPX
       redirect_to edit_order_checkout_url(@order, :step => "payment")
     end
+  rescue ActiveMerchant::ConnectionError => e
+    gateway_error I18n.t(:unable_to_connect_to_gateway)
+    redirect_to edit_order_url(@order)
   end
 
   # Local call from A) Order Review Screen, or B) Automatically after paypal_confirm (no review).
@@ -180,6 +190,9 @@ module Spree::PaypalExpress
       #Failed trying to complete pending payment!
       redirect_to edit_order_checkout_url(@order, :step => "payment")
     end
+  rescue ActiveMerchant::ConnectionError => e
+    gateway_error I18n.t(:unable_to_connect_to_gateway)
+    redirect_to edit_order_url(@order)
   end
 
   private
@@ -347,10 +360,15 @@ module Spree::PaypalExpress
   end
 
   def gateway_error(response)
-    text = response.params['message'] ||
-           response.params['response_reason_text'] ||
-           response.message
-    msg = "#{I18n.t('gateway_error')} ... #{text}"
+    if response.is_a? ActiveMerchant::Billing::Response
+      text = response.params['message'] ||
+             response.params['response_reason_text'] ||
+             response.message
+    else
+      text = response.to_s
+    end
+
+    msg = "#{I18n.t('gateway_error')}: #{text}"
     logger.error(msg)
     flash[:error] = msg
   end
