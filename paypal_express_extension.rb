@@ -19,6 +19,19 @@ class PaypalExpressExtension < Spree::Extension
     CheckoutsController.class_eval do
       include Spree::PaypalExpress
     end
-    
+
+    Checkout.class_eval do
+      private
+        def complete_order
+          order.complete!
+
+          # do not transition echeck order to paid regardless of auto-capture
+          # echecks are finalized via IPN callback only
+          if Spree::Config[:auto_capture] && !order.checkout.payments.any? {|p| payment.source.is_a?(PaypalAccount) && p.source.echeck?(p) }
+            order.pay!
+          end
+        end
+    end
+
   end
 end
