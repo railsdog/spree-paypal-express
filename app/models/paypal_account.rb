@@ -71,6 +71,10 @@ class PaypalAccount < ActiveRecord::Base
     false
   end
 
+  def echeck?(payment)
+    payment.txns.exists?(:payment_type => "echeck")
+  end
+
   private
   def find_authorization(payment)
     #find the transaction associated with the original authorization/capture
@@ -84,10 +88,6 @@ class PaypalAccount < ActiveRecord::Base
     payment.txns.find(:first,
               :conditions => {:payment_status => "Completed", :txn_type => PaypalTxn::TxnType::CAPTURE.to_s},
               :order => 'created_at DESC')
-  end
-
-  def echeck?(payment)
-    payment.txns.exists?(:payment_type => "echeck")
   end
 
   def gateway_error(text)
