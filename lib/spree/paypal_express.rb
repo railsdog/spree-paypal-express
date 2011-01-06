@@ -239,8 +239,8 @@ module Spree::PaypalExpress
     end
     
     credits_total = 0
-    if credits.respond_to? :compact
-      items.concat credits.compact!
+    if credits.compact!
+      items.concat credits
       credits_total = credits.map {|i| i[:amount] * i[:qty] }.sum
     end
     
