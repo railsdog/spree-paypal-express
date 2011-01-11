@@ -8,7 +8,7 @@ class PaypalExpressCallbacksController < Spree::BaseController
     @notification = Paypal::Notification.new(request.raw_post)
 
     # we only care about eChecks (for now?)
-    if @notification.params["payment_type"] == "echeck" && @notification.acknowledge && @payment
+    if @notification.params["payment_type"] == "echeck" && @notification.acknowledge && @payment && @order.total >= @payment.amount
       case @notification.params["payment_status"]
         when "Denied"
           create_txn PaypalTxn::TxnType::DENIED
