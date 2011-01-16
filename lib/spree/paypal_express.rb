@@ -239,10 +239,11 @@ module Spree::PaypalExpress
     end
     
     credits_total = 0
-    if credits.compact!
-      items.concat credits
-      credits_total = credits.map {|i| i[:amount] * i[:qty] }.sum
-    end
+     credits.compact!
+     if !credits.empty?  
+       items.concat credits
+       credits_total = credits.map {|i| i[:amount] * i[:qty] }.sum
+     end
     
     opts = { :return_url        => request.protocol + request.host_with_port + "/orders/#{order.number}/checkout/paypal_confirm?payment_method_id=#{payment_method}",
              :cancel_return_url => "http://"  + request.host_with_port + "/orders/#{order.number}/edit",
