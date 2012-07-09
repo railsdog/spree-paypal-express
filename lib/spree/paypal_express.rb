@@ -37,6 +37,10 @@ module Spree::PaypalExpress
   #
   def paypal_payment
     load_object
+
+    # Remove all other payments
+    @checkout.order.payments.clear
+
     opts = all_opts(@order,params[:payment_method_id], 'payment')
     opts.merge!(address_options(@order))
     gateway = paypal_gateway
